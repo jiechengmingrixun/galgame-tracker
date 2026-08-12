@@ -1,0 +1,53 @@
+/* src/assets/main.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply font-sans text-slate-700 bg-gradient-to-br from-sakura-50 via-white to-lavender-50 min-h-screen;
+    font-feature-settings: "palt";
+  }
+  ::selection {
+    @apply bg-sakura-200/70 text-sakura-900;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/70 backdrop-blur-xl border border-white/60 shadow-[0_4px_24px_rgba(255,182,193,0.15)] rounded-2xl;
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-sakura-400 to-lavender-400 text-white text-sm font-medium shadow-md hover:shadow-lg hover:shadow-sakura-200 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl text-sm text-slate-600 hover:bg-sakura-50 hover:text-sakura-600 transition-colors;
+  }
+  .input-field {
+    @apply w-full px-3.5 py-2 rounded-xl bg-white/80 border border-sakura-100 focus:border-sakura-300 focus:ring-2 focus:ring-sakura-200/40 outline-none transition-all text-sm text-slate-700 placeholder:text-slate-300;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full bg-lavender-100 text-lavender-700 border border-lavender-200/60;
+  }
+  .chip-sakura {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 text-xs rounded-full bg-sakura-100 text-sakura-700 border border-sakura-200/60;
+  }
+}
+
+/* 简单滚动条美化 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #ffc2cf, #c4b0ff);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}

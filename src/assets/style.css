@@ -1,0 +1,107 @@
+/* src/assets/style.css — Tailwind + 全局二次元柔和配色 */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  --bg-grad-1: #fff5f7;
+  --bg-grad-2: #f7f5ff;
+  --bg-grad-3: #eef2ff;
+  --card-bg: rgba(255, 255, 255, 0.78);
+  --card-border: rgba(255, 194, 207, 0.6);
+  --text-main: #2b2438;
+  --text-sub: #6b6280;
+  --accent: #ff6b8a;
+  --accent-2: #8a5bf6;
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family:
+    'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', 'Segoe UI', -apple-system,
+    BlinkMacSystemFont, system-ui, sans-serif;
+  color: var(--text-main);
+  background: linear-gradient(
+      135deg,
+      var(--bg-grad-1) 0%,
+      var(--bg-grad-2) 50%,
+      var(--bg-grad-3) 100%
+    )
+    fixed;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer components {
+  .glass-card {
+    @apply rounded-2xl border shadow-sm backdrop-blur transition-all duration-300;
+    background: var(--card-bg);
+    border-color: var(--card-border);
+  }
+  .glass-card:hover {
+    @apply -translate-y-0.5;
+    box-shadow:
+      0 10px 28px -10px rgba(255, 107, 138, 0.28),
+      0 6px 14px -8px rgba(138, 91, 246, 0.25);
+  }
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-white
+           transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed;
+    background: linear-gradient(135deg, #ff6b8a, #8a5bf6);
+  }
+  .btn-primary:hover:not(:disabled) {
+    filter: brightness(1.05);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px -6px rgba(255, 107, 138, 0.55);
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sakura-700
+           bg-white/60 border border-sakura-100 hover:bg-white transition;
+  }
+  .tag-chip {
+    @apply inline-flex items-center rounded-full px-3 py-0.5 text-xs font-medium;
+    background: linear-gradient(135deg, #ffe0e6, #efeaff);
+    color: #6a3dbf;
+    border: 1px solid rgba(201, 162, 255, 0.35);
+  }
+  .input,
+  .textarea,
+  select.input {
+    @apply w-full rounded-xl border bg-white/80 px-3 py-2 text-sm outline-none transition
+           focus:border-sakura-400 focus:ring-2 focus:ring-sakura-200;
+    border-color: rgba(226, 208, 240, 0.9);
+    color: var(--text-main);
+  }
+  .label {
+    @apply block text-sm font-medium mb-1 text-[color:var(--text-sub)];
+  }
+  .status-badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold;
+  }
+  .status-not_started { @apply bg-gray-100 text-gray-600; }
+  .status-in_progress { @apply bg-amber-100 text-amber-700; }
+  .status-completed   { @apply bg-emerald-100 text-emerald-700; }
+  .status-dropped     { @apply bg-rose-100 text-rose-700; }
+  .status-wishlist    { @apply bg-lavender-100 text-lavender-700; }
+}
+
+/* 滚动条（柔和风） */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(#ffc2cf, #c4b0ff);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}

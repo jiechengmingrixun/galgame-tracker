@@ -1,0 +1,36 @@
+# =====================================================================
+#   Supabase 防休眠定时 ping（GitHub Actions）
+#   功能：Supabase Free Plan 会在 7 天无连接后暂停数据库实例。
+#         本工作流每 6 小时对数据库做一次轻量 SELECT 1 查询，
+#         模拟"有访问"从而避免实例休眠。
+#   Secrets: 同上一个 workflow（SUPABASE_HOST / PORT / USER / PASSWORD）
+# =====================================================================
+
+name: Supabase Keep Alive
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # 每 6 小时触发一次
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    container:
+      image: postgres:15-alpine
+    steps:
+      - name: Keepalive query
+        env:
+          PGDATABASE: postgres
+          PGHOST: ${{ secrets.SUPABASE_HOST }}
+          PGPORT: ${{ secrets.SUPABASE_PORT }}
+          PGUSER: ${{ secrets.SUPABASE_USER }}
+          PGPASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
+          PGCONNECT_TIMEOUT: 20
+        run: |
+          set +e
+          for i in 1 2 3; do
+            echo "== attempt $i =="
+            psql -c 'SELECT 1 AS keepalive;' && break
+            sleep 5
+          done
