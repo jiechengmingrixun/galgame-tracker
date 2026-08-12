@@ -10,6 +10,10 @@
       "destination": "/api/vndb-proxy/:path*"
     },
     {
+      "source": "/api/bangumi-proxy/:path*",
+      "destination": "/api/bangumi-proxy/:path*"
+    },
+    {
       "source": "/api/image-proxy",
       "destination": "/api/image-proxy"
     },
