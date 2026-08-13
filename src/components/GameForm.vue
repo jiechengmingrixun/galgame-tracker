@@ -387,8 +387,10 @@ async function onSubmit(e: Event) {
     } else {
       await store.createRecord(payload)
     }
-    // 保存成功后强制从服务器重新拉取最新数据，确保首页立即展示新封面
-    await store.fetchAll(true)
+    // 注意：不要在这里调用 fetchAll(true)，因为 Supabase 可能存在读延迟，
+    // fetchAll 返回的旧数据会覆盖刚用 payload 修正过的内存 records。
+    // 改为：updateRecord/createRecord 内部已清空 lastFetched，
+    // 首页 onMounted 会自动重新拉取，此时 Supabase 已完成写入。
     router.push('/')
   } catch (err) {
     submitError.value = '保存失败：' + (err as Error).message

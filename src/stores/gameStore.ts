@@ -157,7 +157,26 @@ export const useGameStore = defineStore('game', {
           .select('*')
           .order('updated_at', { ascending: false })
         if (error) throw error
-        this.records = (data ?? []) as GameRecord[]
+        const freshRecords = (data ?? []) as GameRecord[]
+        // 防御：如果内存中已有某条记录的 cover_url/cg_urls/merch_urls
+        // 是用户刚刚提交的 B2 代理 URL（说明来自最近的 create/update），
+        // 则用内存中的值覆盖服务器返回值，防止 Supabase 读延迟回滚。
+        // 但保留服务器的 updated_at（cache-bust 需要用）。
+        for (const fresh of freshRecords) {
+          const cached = this.records.find((r) => r.id === fresh.id)
+          if (cached) {
+            const pickCached = (val: unknown): boolean =>
+              typeof val === 'string' && val.startsWith('/api/b2-image-proxy')
+            if (pickCached(cached.cover_url)) fresh.cover_url = cached.cover_url
+            if (cached.cg_urls?.some(pickCached)) {
+              fresh.cg_urls = cached.cg_urls
+            }
+            if (cached.merch_urls?.some(pickCached)) {
+              fresh.merch_urls = cached.merch_urls
+            }
+          }
+        }
+        this.records = freshRecords
         this.lastFetched = now
       } finally {
         this.loading = false
