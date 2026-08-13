@@ -111,11 +111,24 @@ export default async function handler(req: Request): Promise<Response> {
     const contentType = response.ContentType || 'application/octet-stream'
     const cacheControl = 'public, max-age=31536000, immutable'
 
-    // 在 Edge Runtime 中，直接将 S3 返回的流传给 Response
-    return new Response(response.Body as BodyInit, {
+    // 手动将 S3 流转成 Uint8Array
+    const chunks: Uint8Array[] = []
+    for await (const chunk of response.Body as any) {
+      chunks.push(new Uint8Array(chunk))
+    }
+    const totalLen = chunks.reduce((s, c) => s + c.length, 0)
+    const body = new Uint8Array(totalLen)
+    let offset = 0
+    for (const c of chunks) {
+      body.set(c, offset)
+      offset += c.length
+    }
+
+    return new Response(body, {
       status: 200,
       headers: {
         'Content-Type': contentType,
+        'Content-Length': String(body.length),
         'Cache-Control': cacheControl,
         'Access-Control-Allow-Origin': '*',
       },
