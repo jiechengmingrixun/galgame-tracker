@@ -8,9 +8,12 @@ on:
 jobs:
   backup:
     runs-on: ubuntu-latest
-    container:
-      image: postgres:15-alpine
     steps:
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client
+
       - name: Generate timestamp & filename
         id: meta
         run: |
@@ -20,26 +23,22 @@ jobs:
 
       - name: Run pg_dump
         env:
-          PGDATABASE: postgres
           PGHOST: ${{ secrets.SUPABASE_HOST }}
           PGPORT: ${{ secrets.SUPABASE_PORT }}
           PGUSER: postgres
           PGPASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
         run: |
-          set -euo pipefail
-          apk add --no-cache gzip bind-tools
-          # 强制解析 IPv4 地址（避免 IPv6 不通）
+          set -e
           IPV4=$(getent ahostsv4 "$PGHOST" | head -1 | awk '{print $1}')
-          echo "Resolved IPv4: $IPV4"
+          echo "Connecting to $PGHOST => $IPV4:$PGPORT"
           pg_dump \
-            --hostaddr="$IPV4" \
-            --host="$PGHOST" \
+            --host="$IPV4" \
             --port="$PGPORT" \
             --username="$PGUSER" \
             --no-comments \
             --no-owner \
             --no-privileges \
-            --dbname="$PGDATABASE" | gzip -9 > "${{ steps.meta.outputs.file }}"
+            --dbname=postgres | gzip -9 > "${{ steps.meta.outputs.file }}"
           ls -lh "${{ steps.meta.outputs.file }}"
 
       - name: Upload backup as Artifact
