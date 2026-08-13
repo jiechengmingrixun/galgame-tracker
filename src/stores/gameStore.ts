@@ -166,7 +166,22 @@ export const useGameStore = defineStore('game', {
     /** 按 ID 获取单条（优先用缓存，没有则查库） */
     async fetchById(id: string): Promise<GameRecord | null> {
       const cached = this.records.find((r) => r.id === id)
-      if (cached) return cached
+      if (cached) {
+        // 缓存中可能没有私人笔记，尝试单独查询
+        if (cached.private_notes === undefined) {
+          try {
+            const { data: noteData } = await supabase
+              .from('game_private_notes')
+              .select('notes')
+              .eq('game_id', id)
+              .maybeSingle()
+            cached.private_notes = (noteData as { notes?: string | null } | null)?.notes ?? null
+          } catch {
+            cached.private_notes = null
+          }
+        }
+        return cached
+      }
       const { data, error } = await supabase
         .from(TABLE_NAME)
         .select('*')
@@ -174,17 +189,32 @@ export const useGameStore = defineStore('game', {
         .maybeSingle()
       if (error) throw error
       if (data) {
+        const rec = data as GameRecord
+        // 单独查询私人笔记（RLS 保护：非 owner 会拿到 null）
+        try {
+          const { data: noteData } = await supabase
+            .from('game_private_notes')
+            .select('notes')
+            .eq('game_id', id)
+            .maybeSingle()
+          rec.private_notes = (noteData as { notes?: string | null } | null)?.notes ?? null
+        } catch {
+          rec.private_notes = null
+        }
         // 写入缓存
-        if (!this.records.find((r) => r.id === id)) this.records.push(data as GameRecord)
-        return data as GameRecord
+        if (!this.records.find((r) => r.id === id)) this.records.push(rec)
+        return rec
       }
       return null
     },
 
     /** 新增（需管理员） */
     async createRecord(payload: GameRecordInput): Promise<GameRecord> {
+      // private_notes 已拆到独立表，不写入 games 表
+      const privateNotes = payload.private_notes ?? null
+      const { private_notes: _removed, ...inputWithoutNotes } = payload
       const input: GameRecordInput = {
-        ...payload,
+        ...inputWithoutNotes,
         tags: payload.tags?.length ? payload.tags : [],
         scenario_writers: payload.scenario_writers?.length ? payload.scenario_writers : [],
         artists: payload.artists?.length ? payload.artists : [],
@@ -202,11 +232,19 @@ export const useGameStore = defineStore('game', {
       if (error) throw error
       const rec = data as GameRecord
       this.records.unshift(rec)
+
+      // 如果有私人笔记，写入独立表
+      if (privateNotes && privateNotes.trim()) {
+        await this.savePrivateNotes(rec.id, privateNotes)
+      }
       return rec
     },
 
     /** 更新（需管理员） */
     async updateRecord(id: string, payload: Partial<GameRecordInput>): Promise<GameRecord> {
+      // private_notes 已拆到独立表，不更新 games 表
+      const privateNotes = payload.private_notes
+      const { private_notes: _removed, ...payloadWithoutNotes } = payload
       const arrays: (keyof GameRecordInput)[] = [
         'tags',
         'scenario_writers',
@@ -217,7 +255,7 @@ export const useGameStore = defineStore('game', {
         'merch_urls',
       ]
       const sanitized: Record<string, unknown> = {}
-      for (const [key, value] of Object.entries(payload)) {
+      for (const [key, value] of Object.entries(payloadWithoutNotes)) {
         if (arrays.includes(key as keyof GameRecordInput)) {
           sanitized[key] = Array.isArray(value) ? value : []
         } else {
@@ -234,7 +272,30 @@ export const useGameStore = defineStore('game', {
       const rec = data as GameRecord
       const idx = this.records.findIndex((r) => r.id === id)
       if (idx >= 0) this.records[idx] = rec
+
+      // 如果 payload 里包含 private_notes，同步到独立表
+      if (privateNotes !== undefined) {
+        await this.savePrivateNotes(id, privateNotes)
+      }
       return rec
+    },
+
+    /** 保存私人笔记（upsert 到 game_private_notes 表） */
+    async savePrivateNotes(gameId: string, notes: string | null): Promise<void> {
+      const trimmed = notes?.trim() || null
+      if (trimmed) {
+        const { error } = await supabase
+          .from('game_private_notes')
+          .upsert({ game_id: gameId, notes: trimmed }, { onConflict: 'game_id' })
+        if (error) throw error
+      } else {
+        // 空笔记则删除记录
+        const { error } = await supabase
+          .from('game_private_notes')
+          .delete()
+          .eq('game_id', gameId)
+        if (error) throw error
+      }
     },
 
     /** 删除（需管理员） */
