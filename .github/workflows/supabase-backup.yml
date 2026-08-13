@@ -1,10 +1,8 @@
 # =====================================================================
-#   Supabase 数据库定时备份（GitHub Actions）
-#   功能：每天使用 pg_dump 将数据库 dump 为 SQL 并上传 Artifact
-#   配置：
-#     GitHub Settings → Secrets → Actions 添加：
-#     SUPABASE_HOST        db.tdwbjahvsonfoawghmrk.supabase.co
-#     SUPABASE_PORT        5432（直连）或 6543（pooler）
+#   Supabase 数据库定时备份
+#   配置（GitHub Secrets）：
+#     SUPABASE_HOST        例: aws-0-ap-southeast-1.pooler.supabase.com
+#     SUPABASE_PORT        例: 6543
 #     SUPABASE_PASSWORD    你的数据库密码
 # =====================================================================
 
