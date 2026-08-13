@@ -1,11 +1,3 @@
-# =====================================================================
-#   Supabase 数据库定时备份
-#   配置（GitHub Secrets）：
-#     SUPABASE_HOST        例: aws-0-ap-southeast-1.pooler.supabase.com
-#     SUPABASE_PORT        例: 6543
-#     SUPABASE_PASSWORD    你的数据库密码
-# =====================================================================
-
 name: Supabase DB Backup
 
 on:
@@ -35,8 +27,12 @@ jobs:
           PGPASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
         run: |
           set -euo pipefail
-          apk add --no-cache gzip
+          apk add --no-cache gzip bind-tools
+          # 强制解析 IPv4 地址（避免 IPv6 不通）
+          IPV4=$(getent ahostsv4 "$PGHOST" | head -1 | awk '{print $1}')
+          echo "Resolved IPv4: $IPV4"
           pg_dump \
+            --hostaddr="$IPV4" \
             --host="$PGHOST" \
             --port="$PGPORT" \
             --username="$PGUSER" \
