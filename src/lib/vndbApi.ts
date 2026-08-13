@@ -172,6 +172,8 @@ export function vndbToForm(vn: VndbVisualNovel) {
  */
 export function proxiedImageUrl(originalUrl: string | null | undefined): string | undefined {
   if (!originalUrl) return undefined
+  // B2 代理 URL 直接返回，不需要再套一层 image-proxy
+  if (originalUrl.startsWith('/api/b2-image-proxy')) return originalUrl
   return `/api/image-proxy?url=${encodeURIComponent(originalUrl)}`
 }
 
