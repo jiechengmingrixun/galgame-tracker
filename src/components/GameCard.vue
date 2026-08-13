@@ -18,9 +18,13 @@ const props = defineProps<{
 }>()
 
 // 封面图地址：使用 proxiedImageUrl() 自动处理开发/生产环境代理
+// 附加 updated_at 作为 cache-bust 参数，强制浏览器在更新后重新拉取图片
 const coverSrc = computed<string>(() => {
   const url = proxiedImageUrl(props.game.cover_url)
-  return url || ''
+  if (!url) return ''
+  const ts = new Date(props.game.updated_at || Date.now()).getTime()
+  const sep = url.includes('?') ? '&' : '?'
+  return `${url}${sep}t=${ts}`
 })
 
 // 游玩状态对应的中文标签 + Tailwind 配色（不硬编码游戏数据，只做 UI 映射）

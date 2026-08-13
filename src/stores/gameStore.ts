@@ -231,7 +231,14 @@ export const useGameStore = defineStore('game', {
         .select()
         .single()
       if (error) throw error
-      const rec = data as GameRecord
+      let rec = data as GameRecord
+      // 防御：用本次提交的 payload 值覆盖 select 返回值，防止 Supabase 读延迟返回旧快照
+      rec = {
+        ...rec,
+        cover_url: payload.cover_url ?? rec.cover_url,
+        cg_urls: payload.cg_urls ?? rec.cg_urls,
+        merch_urls: payload.merch_urls ?? rec.merch_urls,
+      }
       this.records.unshift(rec)
       // 强制下次 fetchAll 从服务器重新拉取，避免首页读到旧缓存
       this.lastFetched = null
@@ -264,8 +271,15 @@ export const useGameStore = defineStore('game', {
         .eq('id', id)
 
       if (selectError) throw selectError
-      const rec = (Array.isArray(data) ? data[0] : data) as GameRecord
+      let rec = (Array.isArray(data) ? data[0] : data) as GameRecord
       if (!rec) throw new Error('更新失败：未找到记录')
+      // 防御：用本次提交的 payload 值覆盖 select 返回值，防止 Supabase 读延迟返回旧快照
+      rec = {
+        ...rec,
+        cover_url: payload.cover_url !== undefined ? payload.cover_url : rec.cover_url,
+        cg_urls: payload.cg_urls !== undefined ? payload.cg_urls : rec.cg_urls,
+        merch_urls: payload.merch_urls !== undefined ? payload.merch_urls : rec.merch_urls,
+      }
       const idx = this.records.findIndex((r) => r.id === id)
       if (idx >= 0) this.records[idx] = rec
       // 强制下次 fetchAll 从服务器重新拉取，确保首页读到最新数据

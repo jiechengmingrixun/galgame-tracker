@@ -387,6 +387,8 @@ async function onSubmit(e: Event) {
     } else {
       await store.createRecord(payload)
     }
+    // 保存成功后强制从服务器重新拉取最新数据，确保首页立即展示新封面
+    await store.fetchAll(true)
     router.push('/')
   } catch (err) {
     submitError.value = '保存失败：' + (err as Error).message
