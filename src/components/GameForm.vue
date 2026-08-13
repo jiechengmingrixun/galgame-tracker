@@ -14,6 +14,8 @@ import { searchBangumi } from '@/lib/bangumiApi'
 import { mergeGameData, type DataSource } from '@/lib/sourceMerge'
 import { validateImageUrls } from '@/lib/r2Helper'
 import { useGameStore } from '@/stores/gameStore'
+import ImageUploader from '@/components/ImageUploader.vue'
+import { supabase } from '@/lib/supabaseClient'
 import type { GameRecord, GameRecordInput, PlayStatus } from '@/types/game'
 
 const props = defineProps<{
@@ -205,6 +207,57 @@ function addUrl(target: 'cgUrls' | 'merchUrls') {
 }
 function removeUrl(target: 'cgUrls' | 'merchUrls', idx: number) {
   form[target].splice(idx, 1)
+}
+
+// ========== 图片上传（CG / 周边） ==========
+const cgUploadInput = ref<HTMLInputElement | null>(null)
+const merchUploadInput = ref<HTMLInputElement | null>(null)
+
+async function handleUrlUpload(
+  e: Event,
+  target: 'cgUrls' | 'merchUrls',
+) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  input.value = ''
+
+  const allowed = ['image/jpeg', 'image/png', 'image/webp']
+  if (!allowed.includes(file.type)) {
+    submitError.value = '⚠️ 仅支持 JPEG / PNG / WebP 格式'
+    return
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    submitError.value = '⚠️ 图片大小不能超过 5MB'
+    return
+  }
+  submitError.value = ''
+
+  const sessionRes = await supabase.auth.getSession()
+  const accessToken = sessionRes.data.session?.access_token
+  if (!accessToken) {
+    submitError.value = '⚠️ 请先登录'
+    return
+  }
+
+  const fd = new FormData()
+  fd.append('file', file)
+
+  try {
+    const resp = await fetch('/api/b2-upload', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: fd,
+    })
+    const data = (await resp.json()) as { success: boolean; url?: string; error?: string }
+    if (!resp.ok || !data.success) {
+      submitError.value = '⚠️ ' + (data.error || '上传失败')
+      return
+    }
+    form[target].push(data.url!)
+  } catch (err) {
+    submitError.value = '⚠️ 上传失败：' + (err as Error).message
+  }
 }
 
 // ========== 状态选项 ==========
@@ -413,8 +466,8 @@ async function onSubmit(e: Event) {
           <input v-model="form.release_date" type="date" class="input-field" />
         </div>
         <div>
-          <label class="block text-xs text-slate-500 mb-1">封面 URL（VNDB 原图直链）</label>
-          <input v-model="form.cover_url" class="input-field" placeholder="https://t.vndb.org/cv/…" />
+          <label class="block text-xs text-slate-500 mb-1">封面图</label>
+          <ImageUploader v-model="form.cover_url" label="上传封面" />
         </div>
       </div>
 
@@ -577,9 +630,21 @@ async function onSubmit(e: Event) {
     <section class="glass-card p-5 space-y-3">
       <div class="flex items-center justify-between">
         <h3 class="font-semibold text-slate-700 flex items-center gap-2"><span>🎁</span>周边</h3>
-        <button type="button" class="text-xs text-sakura-500 hover:text-sakura-600" @click="addUrl('merchUrls')">
-          + 添加周边链接
-        </button>
+        <div class="flex gap-2">
+          <input
+            ref="merchUploadInput"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            style="display:none"
+            @change="(e) => handleUrlUpload(e, 'merchUrls')"
+          />
+          <button type="button" class="text-xs text-sakura-500 hover:text-sakura-600" @click="merchUploadInput?.click()">
+            + 上传图片
+          </button>
+          <button type="button" class="text-xs text-sakura-500 hover:text-sakura-600" @click="addUrl('merchUrls')">
+            + 添加链接
+          </button>
+        </div>
       </div>
       <div v-if="form.merchUrls.length === 0" class="text-sm text-slate-400 italic py-2 text-center">
         还没有添加周边链接～
@@ -588,7 +653,7 @@ async function onSubmit(e: Event) {
         <input
           v-model="form.merchUrls[i]"
           class="input-field !py-1.5 font-mono text-xs"
-          placeholder="https://r2.example.com/game01/merch_01.jpg"
+          placeholder="图片直链或通过上传组件获取"
         />
         <button type="button" class="text-red-400 hover:text-red-600 px-2 shrink-0" @click="removeUrl('merchUrls', i)">
           ✕
@@ -600,9 +665,21 @@ async function onSubmit(e: Event) {
     <section class="glass-card p-5 space-y-3">
       <div class="flex items-center justify-between">
         <h3 class="font-semibold text-slate-700 flex items-center gap-2"><span>🎨</span>CG 图集</h3>
-        <button type="button" class="text-xs text-sakura-500 hover:text-sakura-600" @click="addUrl('cgUrls')">
-          + 添加 CG 链接
-        </button>
+        <div class="flex gap-2">
+          <input
+            ref="cgUploadInput"
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            style="display:none"
+            @change="(e) => handleUrlUpload(e, 'cgUrls')"
+          />
+          <button type="button" class="text-xs text-sakura-500 hover:text-sakura-600" @click="cgUploadInput?.click()">
+            + 上传图片
+          </button>
+          <button type="button" class="text-xs text-sakura-500 hover:text-sakura-600" @click="addUrl('cgUrls')">
+            + 添加链接
+          </button>
+        </div>
       </div>
       <div v-if="form.cgUrls.length === 0" class="text-sm text-slate-400 italic py-2 text-center">
         还没有添加 CG 链接～
@@ -611,7 +688,7 @@ async function onSubmit(e: Event) {
         <input
           v-model="form.cgUrls[i]"
           class="input-field !py-1.5 font-mono text-xs"
-          placeholder="https://r2.example.com/game01/cg_01.jpg"
+          placeholder="图片直链或通过上传组件获取"
         />
         <button type="button" class="text-red-400 hover:text-red-600 px-2 shrink-0" @click="removeUrl('cgUrls', i)">
           ✕
@@ -622,7 +699,7 @@ async function onSubmit(e: Event) {
     <!-- ======== 提交 ======== -->
     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 pt-2">
       <p v-if="submitError" class="text-sm text-red-500">{{ submitError }}</p>
-      <p v-else class="text-xs text-slate-400">说明：所有图片上传至 Cloudflare R2，将直链粘贴即可</p>
+      <p v-else class="text-xs text-slate-400">说明：封面图通过上传组件自动保存，CG/周边图片可粘贴直链或后续添加上传功能</p>
       <div class="flex gap-2 justify-end">
         <button type="button" class="btn-ghost" @click="router.push('/')">
           取消
