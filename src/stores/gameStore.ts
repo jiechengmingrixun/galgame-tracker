@@ -247,17 +247,22 @@ export const useGameStore = defineStore('game', {
       const privateNotes = payload.private_notes
       const { private_notes: _removed, ...payloadWithoutNotes } = payload
 
-      const { data, error } = await supabase
+      // 先更新
+      const { error: updateError } = await supabase
         .from(TABLE_NAME)
-        .upsert({
-          id,
-          ...payloadWithoutNotes,
-          updated_at: new Date().toISOString(),
-        } as never, { onConflict: 'id' })
-        .select()
+        .update({ ...payloadWithoutNotes, updated_at: new Date().toISOString() } as never)
+        .eq('id', id)
 
-      if (error) throw error
-      const rec = (Array.isArray(data) ? data.find((r) => r.id === id) ?? data[0] : data) as GameRecord
+      if (updateError) throw updateError
+
+      // 再查询回结果（避免 .single() 多行问题）
+      const { data, error: selectError } = await supabase
+        .from(TABLE_NAME)
+        .select('*')
+        .eq('id', id)
+
+      if (selectError) throw selectError
+      const rec = (Array.isArray(data) ? data[0] : data) as GameRecord
       if (!rec) throw new Error('更新失败：未找到记录')
       const idx = this.records.findIndex((r) => r.id === id)
       if (idx >= 0) this.records[idx] = rec
