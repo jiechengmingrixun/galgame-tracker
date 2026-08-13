@@ -19,7 +19,7 @@ jobs:
         run: |
           TS=$(date +%Y%m%d-%H%M)
           echo "ts=$TS" >> "$GITHUB_OUTPUT"
-          echo "file=galgame-db-$TS.sql.gz" >> "$GITHUB_OUTPUT"
+          echo "file=galgame-db-$TS.sql" >> "$GITHUB_OUTPUT"
 
       - name: Run pg_dump
         env:
@@ -31,15 +31,25 @@ jobs:
           set -e
           IPV4=$(getent ahostsv4 "$PGHOST" | head -1 | awk '{print $1}')
           echo "Connecting to $PGHOST => $IPV4:$PGPORT"
+          # 先检查数据库里有什么表
+          echo "=== Database tables ==="
+          psql --host="$IPV4" --port="$PGPORT" --username="$PGUSER" --dbname=postgres -c "\dt" || true
+          # 导出完整数据库
           pg_dump \
             --host="$IPV4" \
             --port="$PGPORT" \
             --username="$PGUSER" \
-            --no-comments \
+            --dbname=postgres \
+            --format=plain \
             --no-owner \
             --no-privileges \
-            --dbname=postgres | gzip -9 > "${{ steps.meta.outputs.file }}"
+            --file="${{ steps.meta.outputs.file }}"
+          # 显示文件信息
           ls -lh "${{ steps.meta.outputs.file }}"
+          echo "=== First 30 lines ==="
+          head -30 "${{ steps.meta.outputs.file }}"
+          echo "=== Total lines ==="
+          wc -l "${{ steps.meta.outputs.file }}"
 
       - name: Upload backup as Artifact
         uses: actions/upload-artifact@v4
