@@ -103,7 +103,7 @@ export default async function handler(req: Request): Promise<Response> {
     })
     
     const response = await client.send(command)
-    const body = await response.Body?.transformToByteArray()
+    const body = response.Body ? await response.Body.transformToBuffer() : null
 
     if (!body) {
       return new Response('No body', { status: 502 })
