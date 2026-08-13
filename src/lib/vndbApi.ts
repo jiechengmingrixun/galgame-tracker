@@ -165,14 +165,13 @@ export function vndbToForm(vn: VndbVisualNovel) {
 
 /**
  * VNDB 封面 URL → 可渲染 URL
- * - 开发环境：使用 /api/image-proxy 本地代理绕过防盗链
- * - 生产环境：直接返回原始 URL（VNDB 图片 CDN 无 Referer 防盗链）
+ * - 开发环境：/api/image-proxy?url=...（Vite 本地代理，绕过 VNDB 防盗链）
+ * - 生产环境：/api/image-proxy?url=...（Vercel Edge Function，移除 Referer 绕过 VNDB 防盗链）
+ *   Edge Function 在 Vercel CDN 边缘节点运行，不发送 Referer 头，
+ *   配合 vercel.json rewrite 将 /api/image-proxy 路由到 edge function。
  */
 export function proxiedImageUrl(originalUrl: string | null | undefined): string | undefined {
   if (!originalUrl) return undefined
-  if (import.meta.env.PROD) {
-    return originalUrl
-  }
   return `/api/image-proxy?url=${encodeURIComponent(originalUrl)}`
 }
 

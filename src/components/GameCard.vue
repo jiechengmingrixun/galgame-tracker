@@ -11,18 +11,16 @@
 import { computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import type { GameRecord, PlayStatus } from '@/types/game'
+import { proxiedImageUrl } from '@/lib/vndbApi'
 
 const props = defineProps<{
   game: GameRecord
 }>()
 
-// 封面图地址：
-// - 有 cover_url：拼接 /api/image-proxy?url=<encoded>，统一走图片代理（本地开发由 vite.config.ts 代理转发）
-// - 无 cover_url：返回空字符串，模板里 v-else 分支展示郁金香占位
+// 封面图地址：使用 proxiedImageUrl() 自动处理开发/生产环境代理
 const coverSrc = computed<string>(() => {
-  const raw = props.game.cover_url
-  if (!raw) return ''
-  return `/api/image-proxy?url=${encodeURIComponent(raw)}`
+  const url = proxiedImageUrl(props.game.cover_url)
+  return url || ''
 })
 
 // 游玩状态对应的中文标签 + Tailwind 配色（不硬编码游戏数据，只做 UI 映射）

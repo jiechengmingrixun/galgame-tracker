@@ -8,6 +8,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
 import CgGallery from '@/components/CgGallery.vue'
 import { getCurrentUser, supabase } from '@/lib/supabaseClient'
+import { proxiedImageUrl } from '@/lib/vndbApi'
 import type { GameRecord, PlayStatus } from '@/types/game'
 
 const route = useRoute()
@@ -88,11 +89,9 @@ const displayStatus = computed<PlayStatus>(() => {
   return game.value?.play_status === 'completed' ? 'completed' : 'in_progress'
 })
 
-/** 封面走代理 / 空值占位 */
+/** 封面使用 proxiedImageUrl() 自动处理开发/生产环境代理 */
 const cover = computed(() => {
-  const raw = game.value?.cover_url
-  if (!raw) return ''
-  return `/api/image-proxy?url=${encodeURIComponent(raw)}`
+  return proxiedImageUrl(game.value?.cover_url) || ''
 })
 
 function formatDate(d?: string | null) {

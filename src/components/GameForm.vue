@@ -9,7 +9,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { searchVn, fetchCharactersByVnId, type VndbSearchResult } from '@/lib/vndbApi'
+import { searchVn, fetchCharactersByVnId, proxiedImageUrl, type VndbSearchResult } from '@/lib/vndbApi'
 import { searchBangumi } from '@/lib/bangumiApi'
 import { mergeGameData, type DataSource } from '@/lib/sourceMerge'
 import { validateImageUrls } from '@/lib/r2Helper'
@@ -362,7 +362,7 @@ async function onSubmit(e: Event) {
         >
           <div v-if="vn.cover_url" class="w-14 h-20 shrink-0 rounded-md overflow-hidden bg-slate-100">
             <img
-              :src="`/api/image-proxy?url=${encodeURIComponent(vn.cover_url)}`"
+              :src="proxiedImageUrl(vn.cover_url)"
               class="w-full h-full object-cover"
               referrerpolicy="no-referrer"
             />
