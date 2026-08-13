@@ -87,6 +87,8 @@ export default async function handler(req: Request): Promise<Response> {
 
   try {
     const { S3Client, GetObjectCommand } = await import('@aws-sdk/client-s3')
+    const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner')
+
     const client = new S3Client({
       region: 'us-west-004',
       endpoint: B2_ENDPOINT!,
@@ -101,28 +103,19 @@ export default async function handler(req: Request): Promise<Response> {
       Bucket: B2_BUCKET_NAME!,
       Key: key,
     })
-    
-    const response = await client.send(command)
 
-    if (!response.Body) {
-      return new Response('No body', { status: 502 })
+    // 生成预签名 URL，然后用 fetch 直接下载
+    const signedUrl = await getSignedUrl(client, command, { expiresIn: 3600 })
+    const imageResp = await fetch(signedUrl)
+
+    if (!imageResp.ok) {
+      return new Response('Image not found', { status: imageResp.status })
     }
 
-    const contentType = response.ContentType || 'application/octet-stream'
+    const contentType = imageResp.headers.get('Content-Type') || 'application/octet-stream'
     const cacheControl = 'public, max-age=31536000, immutable'
 
-    // 手动将 S3 流转成 Uint8Array
-    const chunks: Uint8Array[] = []
-    for await (const chunk of response.Body as any) {
-      chunks.push(new Uint8Array(chunk))
-    }
-    const totalLen = chunks.reduce((s, c) => s + c.length, 0)
-    const body = new Uint8Array(totalLen)
-    let offset = 0
-    for (const c of chunks) {
-      body.set(c, offset)
-      offset += c.length
-    }
+    const body = new Uint8Array(await imageResp.arrayBuffer())
 
     return new Response(body, {
       status: 200,
