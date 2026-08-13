@@ -365,7 +365,9 @@ function buildPayload(): GameRecordInput | null {
 
 async function onSubmit(e: Event) {
   e.preventDefault()
+  console.log('提交前 form.cover_url:', form.cover_url)
   const payload = buildPayload()
+  console.log('payload.cover_url:', payload?.cover_url)
   if (!payload) return
 
   submitting.value = true
