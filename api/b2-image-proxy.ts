@@ -103,20 +103,19 @@ export default async function handler(req: Request): Promise<Response> {
     })
     
     const response = await client.send(command)
-    const body = response.Body ? await response.Body.transformToBuffer() : null
 
-    if (!body) {
+    if (!response.Body) {
       return new Response('No body', { status: 502 })
     }
 
     const contentType = response.ContentType || 'application/octet-stream'
-    const cacheControl = 'public, max-age=31536000, immutable' // 1 year cache
+    const cacheControl = 'public, max-age=31536000, immutable'
 
-    return new Response(body, {
+    // 在 Edge Runtime 中，直接将 S3 返回的流传给 Response
+    return new Response(response.Body as BodyInit, {
       status: 200,
       headers: {
         'Content-Type': contentType,
-        'Content-Length': String(body.length),
         'Cache-Control': cacheControl,
         'Access-Control-Allow-Origin': '*',
       },
