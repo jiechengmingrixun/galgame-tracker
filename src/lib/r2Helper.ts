@@ -1,55 +1,48 @@
-// src/lib/b2Helper.ts
-// Backblaze B2 相关帮助函数
+// src/lib/r2Helper.ts
+// Cloudflare R2 相关帮助函数（一期只提供校验与格式化；上传为二期）
 
 /**
- * 生成图片访问 URL (通过 Vercel 代理)
- * @param key B2 桶内路径，例如 "uploads/xxx.jpg"
+ * Cloudflare R2 自定义域名
+ * 形如：https://galgame-cg.yourname.workers.dev 或 https://r2.example.com
+ * 从 .env 读取
  */
-export function toB2ProxyUrl(key: string): string {
+export const R2_PUBLIC_BASE = import.meta.env.VITE_R2_PUBLIC_URL as string | undefined
+
+/** 检查链接是否来自 R2 自定义域名 */
+export function isR2Url(url: string): boolean {
+  if (!R2_PUBLIC_BASE) return url.includes('r2') && url.startsWith('http')
+  return url.startsWith(R2_PUBLIC_BASE)
+}
+
+/**
+ * 拼接 R2 对象路径 -> 完整 URL
+ * @param key R2 桶内路径，例如 "2024-summer/cg01.jpg"
+ */
+export function toR2Url(key: string): string {
+  const base = (R2_PUBLIC_BASE || '').replace(/\/$/, '')
   const cleanKey = key.replace(/^\//, '')
-  return `/api/b2-image-proxy?fileKey=${encodeURIComponent(cleanKey)}`
+  return `${base}/${cleanKey}`
 }
 
 /**
- * 从 URL 中解析 fileKey
- * @param url 图片 URL
+ * 校验一个字符串数组中的 URL 是否都是合法的 http(s) 直链或 B2 代理地址
+ * 返回 { ok, invalidItems }
  */
-export function extractKeyFromUrl(url: string): string {
-  if (!url) return ''
-  // 如果是代理 URL
-  if (url.startsWith('/api/b2-image-proxy')) {
-    try {
-      const u = new URL(`http://localhost${url}`) // 模拟完整 URL
-      return u.searchParams.get('fileKey') || ''
-    } catch {
-      return ''
+export function validateImageUrls(urls: string[]): {
+  ok: boolean
+  invalidItems: number[]
+} {
+  const invalid: number[] = []
+  urls.forEach((u, i) => {
+    const trimmed = u.trim()
+    if (
+      !trimmed ||
+      /^https?:\/\/.+\.(jpg|jpeg|png|webp|avif|gif|bmp)(\?.*)?$/i.test(trimmed) ||
+      trimmed.startsWith('/api/b2-image-proxy')
+    ) {
+      return
     }
-  }
-  // 如果是完整的 B2 URL
-  try {
-    const u = new URL(url)
-    return u.pathname.replace(/^\/+/, '')
-  } catch {
-    const idx = url.indexOf('://')
-    const rest = idx >= 0 ? url.slice(idx + 3) : url
-    const slashIdx = rest.indexOf('/')
-    return slashIdx >= 0 ? rest.slice(slashIdx + 1) : ''
-  }
-}
-
-/**
- * 从代理 URL 中解析 fileKey
- * @param url 代理 URL
- */
-export function getKeyFromProxyUrl(url: string): string {
-  if (!url) return ''
-  if (url.startsWith('/api/b2-image-proxy')) {
-    try {
-      const u = new URL(`http://localhost${url}`)
-      return u.searchParams.get('fileKey') || ''
-    } catch {
-      return ''
-    }
-  }
-  return url
+    invalid.push(i)
+  })
+  return { ok: invalid.length === 0, invalidItems: invalid }
 }
