@@ -1,8 +1,9 @@
 // src/lib/vndbApi.ts
 // VNDB Kana API 搜索封装
-// 开发 & 生产环境统一使用 /api/vndb-proxy 相对路径
-// - 开发：Vite 代理 /api/vndb-proxy → https://api.vndb.org/kana/v1
-// - 生产：Vercel Edge Function /api/vndb-proxy
+// 开发 & 生产环境统一使用 /api/vndb-proxy 相对路径：
+//   - 开发：Vite 代理 /api/vndb-proxy → https://api.vndb.org/kana
+//   - 生产：Vercel Rewrite CDN 级代理 /api/vndb-proxy → https://api.vndb.org/kana
+//         （相比 Edge Function，Rewrite 使用 Vercel CDN 主干网 IP，可绕过 Cloudflare 的 IP 封锁）
 
 import type { VndbVisualNovel } from '@/types/game'
 
@@ -163,10 +164,15 @@ export function vndbToForm(vn: VndbVisualNovel) {
 }
 
 /**
- * VNDB 封面 URL → 经图片代理的可渲染 URL
+ * VNDB 封面 URL → 可渲染 URL
+ * - 开发环境：使用 /api/image-proxy 本地代理绕过防盗链
+ * - 生产环境：直接返回原始 URL（VNDB 图片 CDN 无 Referer 防盗链）
  */
 export function proxiedImageUrl(originalUrl: string | null | undefined): string | undefined {
   if (!originalUrl) return undefined
+  if (import.meta.env.PROD) {
+    return originalUrl
+  }
   return `/api/image-proxy?url=${encodeURIComponent(originalUrl)}`
 }
 

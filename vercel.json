@@ -7,15 +7,11 @@
   "rewrites": [
     {
       "source": "/api/vndb-proxy/:path*",
-      "destination": "/api/vndb-proxy/:path*"
+      "destination": "https://api.vndb.org/kana/:path*"
     },
     {
       "source": "/api/bangumi-proxy/:path*",
-      "destination": "/api/bangumi-proxy/:path*"
-    },
-    {
-      "source": "/api/image-proxy",
-      "destination": "/api/image-proxy"
+      "destination": "https://api.bgm.tv/:path*"
     },
     {
       "source": "/(.*)",

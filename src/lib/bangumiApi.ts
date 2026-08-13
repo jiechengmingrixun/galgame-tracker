@@ -1,13 +1,10 @@
 // src/lib/bangumiApi.ts
 // Bangumi (bgm.tv) API v0 封装
+// 开发 & 生产环境统一使用 /api/bangumi-proxy 相对路径：
+//   - 开发：Vite 代理 /api/bangumi-proxy → https://api.bgm.tv
+//   - 生产：Vercel Rewrite CDN 级代理 /api/bangumi-proxy → https://api.bgm.tv
 //
-// 请求基础路径统一使用相对路径 /api/bangumi-proxy，两端分别由代理处理：
-//   ├─ 本地开发：vite.config.ts server.proxy 拦截 /api/bangumi-proxy
-//   │          → 转发到 https://api.bgm.tv，并注入 User-Agent + Accept 头
-//   └─ 生产部署：Vercel Edge Function（vercel/api/bangumi-proxy.ts）
-//              → 同样转发 https://api.bgm.tv + 注入 User-Agent
-//
-// 注：浏览器 fetch 不允许自行设置 User-Agent 头，必须在代理层注入。
+// 注：Bangumi API 在浏览器代理层会注入 User-Agent。
 
 const API_BASE = '/api/bangumi-proxy'
 
