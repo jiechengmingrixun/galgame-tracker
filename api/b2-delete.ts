@@ -99,15 +99,15 @@ export default async function handler(req: Request): Promise<Response> {
     const { S3Client, DeleteObjectCommand } = await import('@aws-sdk/client-s3')
     const client = new S3Client({
       region: 'us-west-004',
-      endpoint: B2_ENDPOINT!,
+      endpoint: B2_ENDPOINT,
       credentials: {
-        accessKeyId: B2_ACCESS_KEY_ID!,
-        secretAccessKey: B2_SECRET_ACCESS_KEY!,
+        accessKeyId: B2_ACCESS_KEY_ID,
+        secretAccessKey: B2_SECRET_ACCESS_KEY,
       },
       forcePathStyle: true,
     })
 
-    await client.send(new DeleteObjectCommand({ Bucket: B2_BUCKET_NAME!, Key: key }))
+    await client.send(new DeleteObjectCommand({ Bucket: B2_BUCKET_NAME, Key: key }))
     return json({ success: true }, 200)
   } catch (err: any) {
     console.error('[b2-delete]', err)

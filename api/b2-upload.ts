@@ -138,18 +138,19 @@ export default async function handler(req: Request): Promise<Response> {
     const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3')
     const client = new S3Client({
       region: 'us-west-004',
-      endpoint: B2_ENDPOINT!,
+      endpoint: B2_ENDPOINT,
       credentials: {
-        accessKeyId: B2_ACCESS_KEY_ID!,
-        secretAccessKey: B2_SECRET_ACCESS_KEY!,
+        accessKeyId: B2_ACCESS_KEY_ID,
+        secretAccessKey: B2_SECRET_ACCESS_KEY,
       },
       forcePathStyle: true,
     })
+    const bodyStream = new Uint8Array(buf) as unknown as ReadableStream
     await client.send(
       new PutObjectCommand({
-        Bucket: B2_BUCKET_NAME!,
+        Bucket: B2_BUCKET_NAME,
         Key: key,
-        Body: buf,
+        Body: bodyStream,
         ContentType: mime,
       }),
     )
