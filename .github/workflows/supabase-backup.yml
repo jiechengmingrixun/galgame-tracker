@@ -8,9 +8,6 @@ on:
 jobs:
   backup:
     runs-on: ubuntu-latest
-    env:
-      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
       - name: Generate timestamp & filename
         id: meta
@@ -20,23 +17,32 @@ jobs:
           echo "dir=galgame-backup-$TS" >> "$GITHUB_OUTPUT"
 
       - name: Export games table
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           mkdir -p "${{ steps.meta.outputs.dir }}"
+          echo "URL: $SUPABASE_URL"
+          echo "ANON_KEY: ${SUPABASE_ANON_KEY:0:20}..."
           echo "Exporting games table ..."
-          DATA=$(curl -s -w "\n%{http_code}" \
+          
+          curl -s \
             -H "apikey: $SUPABASE_ANON_KEY" \
             -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
-            "$SUPABASE_URL/rest/v1/games?select=*&limit=50000")
-          HTTP_CODE=$(echo "$DATA" | tail -1)
-          BODY=$(echo "$DATA" | sed '$d')
-          echo "$BODY" > "${{ steps.meta.outputs.dir }}/games.json"
+            "$SUPABASE_URL/rest/v1/games?select=*&limit=50000" \
+            -o "${{ steps.meta.outputs.dir }}/games.json"
+          
           SIZE=$(stat -c%s "${{ steps.meta.outputs.dir }}/games.json")
-          COUNT_ROWS=$(echo "$BODY" | grep -c '^{"id"')
-          if [ "$HTTP_CODE" = "200" ]; then
-            echo "  -> games: ${COUNT_ROWS} rows, ${SIZE} bytes"
-          else
-            echo "  -> games: ERROR (HTTP $HTTP_CODE), ${SIZE} bytes"
+          echo "File size: $SIZE bytes"
+          
+          if [ "$SIZE" = "0" ]; then
+            echo "ERROR: Empty response"
+            exit 1
           fi
+          
+          COUNT_ROWS=$(grep -c '"id"' "${{ steps.meta.outputs.dir }}/games.json" || echo "0")
+          echo "Games: $COUNT_ROWS entries, $SIZE bytes"
+          
           tar -czf "${{ steps.meta.outputs.dir }}.tar.gz" "${{ steps.meta.outputs.dir }}"
           ls -lh "${{ steps.meta.outputs.dir }}.tar.gz"
           echo "Backup complete!"
