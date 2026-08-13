@@ -246,36 +246,18 @@ export const useGameStore = defineStore('game', {
       // private_notes 已拆到独立表，不更新 games 表
       const privateNotes = payload.private_notes
       const { private_notes: _removed, ...payloadWithoutNotes } = payload
-      const arrays: (keyof GameRecordInput)[] = [
-        'tags',
-        'scenario_writers',
-        'artists',
-        'characters',
-        'screenshot_urls',
-        'cg_urls',
-        'merch_urls',
-      ]
-      const sanitized: Record<string, unknown> = {}
-      for (const [key, value] of Object.entries(payloadWithoutNotes)) {
-        if (value === undefined || value === null) {
-          sanitized[key] = null
-        } else if (arrays.includes(key as keyof GameRecordInput)) {
-          sanitized[key] = Array.isArray(value) ? value : []
-        } else {
-          sanitized[key] = value
-        }
-      }
-      sanitized['updated_at'] = new Date().toISOString()
 
       const { data, error } = await supabase
         .from(TABLE_NAME)
-        .update(sanitized as never)
-        .eq('id', id)
+        .upsert({
+          id,
+          ...payloadWithoutNotes,
+          updated_at: new Date().toISOString(),
+        } as never, { onConflict: 'id' })
         .select()
 
       if (error) throw error
-      // 不使用 .single()，因为可能有多行（虽然理论上不应该）
-      const rec = (Array.isArray(data) ? data[0] : data) as GameRecord
+      const rec = (Array.isArray(data) ? data.find((r) => r.id === id) ?? data[0] : data) as GameRecord
       if (!rec) throw new Error('更新失败：未找到记录')
       const idx = this.records.findIndex((r) => r.id === id)
       if (idx >= 0) this.records[idx] = rec
