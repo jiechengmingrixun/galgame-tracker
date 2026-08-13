@@ -5,7 +5,7 @@ export const config = {
   runtime: 'edge',
 }
 
-async function verifySupabaseJWT(authHeader: string | null, supabaseUrl: string) {
+async function verifySupabaseJWT(authHeader: string | null, supabaseUrl: string, anonKey: string) {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return { valid: false, error: 'Missing or malformed Authorization header', status: 401 }
   }
@@ -15,41 +15,30 @@ async function verifySupabaseJWT(authHeader: string | null, supabaseUrl: string)
   try {
     const parts = token.split('.')
     if (parts.length !== 3) return { valid: false, error: 'Invalid JWT format', status: 401 }
-    const [headerPart, payloadPart, signaturePart] = parts
 
     const b64 = (s: string) => s.replace(/-/g, '+').replace(/_/g, '/')
-    const header = JSON.parse(atob(b64(headerPart)))
-    const payload = JSON.parse(atob(b64(payloadPart)))
-
-    const kid = header.kid
-    if (!kid) return { valid: false, error: 'JWT missing kid', status: 401 }
-
-    const jwksResp = await fetch(`${supabaseUrl}/auth/v1/jwks`)
-    if (!jwksResp.ok) return { valid: false, error: 'Unable to fetch JWKS', status: 502 }
-    const jwks = (await jwksResp.json()) as { keys: Array<{ kid: string; x: string; y: string; use: string }> }
-    const key = jwks.keys.find((k) => k.kid === kid)
-    if (!key) return { valid: false, error: 'JWKS kid not found', status: 401 }
-
-    const jwk: JsonWebKey = { kty: 'RSA', alg: 'PS256', use: 'sig', n: key.x, e: key.y }
-    const cryptoKey = await crypto.subtle.importKey('jwk', jwk, { name: 'RSA-PSS', hash: 'SHA-256' })
-
-    const encoder = new TextEncoder()
-    const signingInput = encoder.encode(`${headerPart}.${payloadPart}`)
-    const sigBytes = Uint8Array.from(atob(b64(signaturePart)), (c) => c.charCodeAt(0))
-    const ok = await crypto.subtle.verify({ name: 'RSA-PSS', saltLength: 32 }, cryptoKey, sigBytes, signingInput)
-    if (!ok) return { valid: false, error: 'JWT signature invalid', status: 401 }
+    const payload = JSON.parse(atob(b64(parts[1])))
 
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
       return { valid: false, error: 'JWT expired', status: 401 }
     }
-    if (payload.iss && !payload.iss.includes('supabase')) {
-      return { valid: false, error: 'Invalid issuer', status: 401 }
+
+    const resp = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'apikey': anonKey,
+      },
+    })
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => null)
+      const msg = err?.msg || 'Invalid or expired token'
+      return { valid: false, error: msg, status: 401 }
     }
-    const role = payload.role
-    if (role !== 'authenticated' && role !== 'admin' && role !== 'service_role') {
-      return { valid: false, error: 'Token role not allowed', status: 403 }
-    }
-    return { valid: true, userId: payload.sub }
+
+    const user = await resp.json()
+    return { valid: true, userId: user.id }
   } catch (err) {
     console.error('[b2-delete][verify]', err)
     return { valid: false, error: 'JWT verification error', status: 500 }
@@ -81,16 +70,18 @@ export default async function handler(req: Request): Promise<Response> {
   const B2_BUCKET_NAME = process.env.B2_BUCKET_NAME
   const B2_ENDPOINT = process.env.B2_ENDPOINT || 'https://s3.us-west-004.backblazeb2.com'
   const SUPABASE_URL = process.env.VITE_SUPABASE_URL
+  const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY
 
   const missing = [
     !B2_ACCESS_KEY_ID && 'B2_ACCESS_KEY_ID',
     !B2_SECRET_ACCESS_KEY && 'B2_SECRET_ACCESS_KEY',
     !B2_BUCKET_NAME && 'B2_BUCKET_NAME',
     !SUPABASE_URL && 'VITE_SUPABASE_URL',
+    !SUPABASE_ANON_KEY && 'VITE_SUPABASE_ANON_KEY',
   ].filter(Boolean)
   if (missing.length > 0) return json({ success: false, error: `Server config missing: ${missing.join(',')}` }, 500)
 
-  const auth = await verifySupabaseJWT(req.headers.get('authorization'), SUPABASE_URL!)
+  const auth = await verifySupabaseJWT(req.headers.get('authorization'), SUPABASE_URL!, SUPABASE_ANON_KEY!)
   if (!auth.valid) return json({ success: false, error: auth.error }, auth.status || 401)
 
   const reqUrl = new URL(req.url)

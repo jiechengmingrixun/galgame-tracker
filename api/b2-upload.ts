@@ -33,7 +33,8 @@ function extFromMime(mime: string): string {
 }
 
 // ---------- JWT 校验 ----------
-async function verifySupabaseJWT(authHeader: string | null, supabaseUrl: string) {
+// 使用 Supabase /auth/v1/user 端点验证 token
+async function verifySupabaseJWT(authHeader: string | null, supabaseUrl: string, anonKey: string) {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return { valid: false, error: 'Missing or malformed Authorization header', status: 401 }
   }
@@ -41,43 +42,34 @@ async function verifySupabaseJWT(authHeader: string | null, supabaseUrl: string)
   if (!token) return { valid: false, error: 'Empty token', status: 401 }
 
   try {
+    // 解析 JWT payload 检查格式和过期
     const parts = token.split('.')
     if (parts.length !== 3) return { valid: false, error: 'Invalid JWT format', status: 401 }
-    const [headerPart, payloadPart, signaturePart] = parts
 
     const b64 = (s: string) => s.replace(/-/g, '+').replace(/_/g, '/')
-    const header = JSON.parse(atob(b64(headerPart)))
-    const payload = JSON.parse(atob(b64(payloadPart)))
-
-    const kid = header.kid
-    if (!kid) return { valid: false, error: 'JWT missing kid', status: 401 }
-
-    const jwksResp = await fetch(`${supabaseUrl}/auth/v1/jwks`)
-    if (!jwksResp.ok) return { valid: false, error: 'Unable to fetch JWKS', status: 502 }
-    const jwks = (await jwksResp.json()) as { keys: Array<{ kid: string; x: string; y: string; use: string }> }
-    const key = jwks.keys.find((k) => k.kid === kid)
-    if (!key) return { valid: false, error: 'JWKS kid not found', status: 401 }
-
-    const jwk: JsonWebKey = { kty: 'RSA', alg: 'PS256', use: 'sig', n: key.x, e: key.y }
-    const cryptoKey = await crypto.subtle.importKey('jwk', jwk, { name: 'RSA-PSS', hash: 'SHA-256' })
-
-    const encoder = new TextEncoder()
-    const signingInput = encoder.encode(`${headerPart}.${payloadPart}`)
-    const sigBytes = Uint8Array.from(atob(b64(signaturePart)), (c) => c.charCodeAt(0))
-    const ok = await crypto.subtle.verify({ name: 'RSA-PSS', saltLength: 32 }, cryptoKey, sigBytes, signingInput)
-    if (!ok) return { valid: false, error: 'JWT signature invalid', status: 401 }
+    const payload = JSON.parse(atob(b64(parts[1])))
 
     if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
       return { valid: false, error: 'JWT expired', status: 401 }
     }
-    if (payload.iss && !payload.iss.includes('supabase')) {
-      return { valid: false, error: 'Invalid issuer', status: 401 }
+
+    // 调用 Supabase /auth/v1/user 验证 token
+    const resp = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'apikey': anonKey,
+      },
+    })
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => null)
+      const msg = err?.msg || 'Invalid or expired token'
+      return { valid: false, error: msg, status: 401 }
     }
-    const role = payload.role
-    if (role !== 'authenticated' && role !== 'admin' && role !== 'service_role') {
-      return { valid: false, error: 'Token role not allowed', status: 403 }
-    }
-    return { valid: true, userId: payload.sub }
+
+    const user = await resp.json()
+    return { valid: true, userId: user.id }
   } catch (err) {
     console.error('[b2-upload][verify]', err)
     return { valid: false, error: 'JWT verification error', status: 500 }
@@ -109,21 +101,23 @@ export default async function handler(req: Request): Promise<Response> {
   const B2_BUCKET_NAME = process.env.B2_BUCKET_NAME
   const B2_ENDPOINT = process.env.B2_ENDPOINT || 'https://s3.us-west-004.backblazeb2.com'
   const SUPABASE_URL = process.env.VITE_SUPABASE_URL
+  const SUPABASE_ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY
 
   const missing = [
     !B2_ACCESS_KEY_ID && 'B2_ACCESS_KEY_ID',
     !B2_SECRET_ACCESS_KEY && 'B2_SECRET_ACCESS_KEY',
     !B2_BUCKET_NAME && 'B2_BUCKET_NAME',
     !SUPABASE_URL && 'VITE_SUPABASE_URL',
+    !SUPABASE_ANON_KEY && 'VITE_SUPABASE_ANON_KEY',
   ].filter(Boolean)
   if (missing.length > 0) return json({ success: false, error: `Server config missing: ${missing.join(',')}` }, 500)
 
-  const auth = await verifySupabaseJWT(req.headers.get('authorization'), SUPABASE_URL!)
+  const auth = await verifySupabaseJWT(req.headers.get('authorization'), SUPABASE_URL!, SUPABASE_ANON_KEY!)
   if (!auth.valid) return json({ success: false, error: auth.error }, auth.status || 401)
 
   let form: FormData
   try { form = await req.formData() } catch { return json({ success: false, error: 'Invalid multipart form' }, 400) }
-  
+
   const file = form.get('file') as File | null
   if (!file) return json({ success: false, error: 'Missing file field' }, 400)
 
@@ -143,13 +137,13 @@ export default async function handler(req: Request): Promise<Response> {
   try {
     const { S3Client, PutObjectCommand } = await import('@aws-sdk/client-s3')
     const client = new S3Client({
-      region: 'us-west-004', // 对应 B2 Endpoint 的区域
+      region: 'us-west-004',
       endpoint: B2_ENDPOINT!,
       credentials: {
         accessKeyId: B2_ACCESS_KEY_ID!,
         secretAccessKey: B2_SECRET_ACCESS_KEY!,
       },
-      forcePathStyle: true, // B2 需要这个配置
+      forcePathStyle: true,
     })
     await client.send(
       new PutObjectCommand({
@@ -164,7 +158,6 @@ export default async function handler(req: Request): Promise<Response> {
     return json({ success: false, error: 'Upload failed: ' + (err as Error).message }, 502)
   }
 
-  // 返回一个通过代理访问的 URL
   const url = `/api/b2-image-proxy?fileKey=${encodeURIComponent(key)}`
   return json({ success: true, url, key }, 200)
 }
