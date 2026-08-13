@@ -331,7 +331,7 @@ async function doDelete() {
           <h3 class="text-lg font-semibold text-slate-800">
             确认删除「{{ game.title }}」？
           </h3>
-          <p class="text-sm text-slate-500">删除后不可恢复（图片仍保留在 R2）。</p>
+          <p class="text-sm text-slate-500">删除后不可恢复（关联的 B2 图片将一并清理）。</p>
           <div class="flex justify-end gap-2">
             <button class="btn-ghost" @click="confirmDelete = false">取消</button>
             <button
