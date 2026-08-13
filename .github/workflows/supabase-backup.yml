@@ -19,32 +19,24 @@ jobs:
           echo "ts=$TS" >> "$GITHUB_OUTPUT"
           echo "dir=galgame-backup-$TS" >> "$GITHUB_OUTPUT"
 
-      - name: Fetch all table names
-        run: |
-          RESPONSE=$(curl -s \
-            -H "apikey: $SUPABASE_ANON_KEY" \
-            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
-            "$SUPABASE_URL/rest/v1/")
-          TABLES=$(echo "$RESPONSE" | grep -oP '"/[a-zA-Z0-9_]+"' | sed 's/"//g' | sort -u | grep -v '^$')
-          echo "Tables found:"
-          echo "$TABLES"
-          echo "$TABLES" > tables.txt
-
-      - name: Export each table as JSON
+      - name: Export games table
         run: |
           mkdir -p "${{ steps.meta.outputs.dir }}"
-          TABLES=$(cat tables.txt)
-          for TABLE in $TABLES; do
-            echo "Exporting $TABLE ..."
-            DATA=$(curl -s \
-              -H "apikey: $SUPABASE_ANON_KEY" \
-              -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
-              "$SUPABASE_URL/rest/v1/$TABLE?select=*&limit=50000")
-            echo "$DATA" > "${{ steps.meta.outputs.dir }}/${TABLE}.json"
-            SIZE=$(stat -c%s "${{ steps.meta.outputs.dir }}/${TABLE}.json")
-            COUNT_ROWS=$(echo "$DATA" | grep -oP '"id"' | wc -l)
-            echo "  -> $TABLE: ${COUNT_ROWS} entries, ${SIZE} bytes"
-          done
+          echo "Exporting games table ..."
+          DATA=$(curl -s -w "\n%{http_code}" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            "$SUPABASE_URL/rest/v1/games?select=*&limit=50000")
+          HTTP_CODE=$(echo "$DATA" | tail -1)
+          BODY=$(echo "$DATA" | sed '$d')
+          echo "$BODY" > "${{ steps.meta.outputs.dir }}/games.json"
+          SIZE=$(stat -c%s "${{ steps.meta.outputs.dir }}/games.json")
+          COUNT_ROWS=$(echo "$BODY" | grep -c '^{"id"')
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "  -> games: ${COUNT_ROWS} rows, ${SIZE} bytes"
+          else
+            echo "  -> games: ERROR (HTTP $HTTP_CODE), ${SIZE} bytes"
+          fi
           tar -czf "${{ steps.meta.outputs.dir }}.tar.gz" "${{ steps.meta.outputs.dir }}"
           ls -lh "${{ steps.meta.outputs.dir }}.tar.gz"
           echo "Backup complete!"
