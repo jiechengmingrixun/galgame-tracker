@@ -3,6 +3,7 @@
 
 import { defineStore } from 'pinia'
 import { supabase } from '@/lib/supabaseClient'
+import { getKeyFromProxyUrl } from '@/lib/b2Helper'
 import type {
   GameRecord,
   GameRecordInput,
@@ -298,8 +299,30 @@ export const useGameStore = defineStore('game', {
       }
     },
 
-    /** 删除（需管理员） */
+    /** 删除（需管理员），同时清理 B2 图片 */
     async deleteRecord(id: string): Promise<void> {
+      const rec = this.records.find((r) => r.id === id)
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+
+      if (rec && token) {
+        const urlsToClean: string[] = []
+        if (rec.cover_url?.startsWith('/api/b2-image-proxy')) urlsToClean.push(rec.cover_url)
+        rec.cg_urls?.forEach((u) => { if (u.startsWith('/api/b2-image-proxy')) urlsToClean.push(u) })
+        rec.merch_urls?.forEach((u) => { if (u.startsWith('/api/b2-image-proxy')) urlsToClean.push(u) })
+
+        for (const url of urlsToClean) {
+          const key = getKeyFromProxyUrl(url)
+          if (!key) continue
+          try {
+            await fetch(`/api/b2-delete?fileKey=${encodeURIComponent(key)}`, {
+              method: 'DELETE',
+              headers: { Authorization: `Bearer ${token}` },
+            })
+          } catch { /* 静默忽略清理失败 */ }
+        }
+      }
+
       const { error } = await supabase.from(TABLE_NAME).delete().eq('id', id)
       if (error) throw error
       this.records = this.records.filter((r) => r.id !== id)
