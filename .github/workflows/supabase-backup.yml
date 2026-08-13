@@ -1,33 +1,28 @@
 # =====================================================================
 #   Supabase 数据库定时备份（GitHub Actions）
 #   功能：每天凌晨 3 点（UTC 19:00）使用 pg_dump 将数据库 dump 为 SQL
-#         并上传到仓库 Release（或 Artifact 保留 30 天）
+#         并上传到 Artifact 保留 30 天
 #   配置：在 GitHub 仓库 Settings → Secrets and variables → Actions
 #         添加下面 4 个 Repository Secrets：
-#         SUPABASE_HOST        例: db.abcxyz.supabase.co
-#         SUPABASE_PORT        通常 6543 或 5432
-#         SUPABASE_USER        例: postgres
-#         SUPABASE_PASSWORD    Database → Settings → Connection string 的密码
+#         SUPABASE_HOST        例: db.tdwbjahvsonfoawghmrk.supabase.co
+#         SUPABASE_PORT        例: 5432（直连）或 6543（pooler）
+#         SUPABASE_USER        postgres
+#         SUPABASE_PASSWORD    你的数据库密码
 # =====================================================================
 
 name: Supabase DB Backup
 
 on:
   schedule:
-    - cron: '0 19 * * *'   # UTC 19:00 = 北京时间次日 03:00
-  workflow_dispatch:       # 允许手动触发
+    - cron: '19 23 * * *'   # 每天 UTC 23:19 = 北京时间次日 07:19
+  workflow_dispatch:
 
 jobs:
   backup:
     runs-on: ubuntu-latest
     container:
       image: postgres:15-alpine
-    env:
-      TZ: Asia/Shanghai
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: Generate timestamp & filename
         id: meta
         run: |
@@ -46,13 +41,16 @@ jobs:
           set -euo pipefail
           apk add --no-cache gzip
           pg_dump \
+            --host="$PGHOST" \
+            --port="$PGPORT" \
+            --username="$PGUSER" \
             --no-comments \
             --no-owner \
             --no-privileges \
-            -d "$PGDATABASE" | gzip -9 > "${{ steps.meta.outputs.file }}"
+            --dbname="$PGDATABASE" | gzip -9 > "${{ steps.meta.outputs.file }}"
           ls -lh "${{ steps.meta.outputs.file }}"
 
-      - name: Upload backup as Artifact (保留 30 天)
+      - name: Upload backup as Artifact
         uses: actions/upload-artifact@v4
         with:
           name: galgame-db-backup-${{ steps.meta.outputs.ts }}
