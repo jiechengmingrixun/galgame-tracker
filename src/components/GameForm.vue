@@ -141,10 +141,15 @@ const synopsisSource = ref<DataSource>('none')
 const enriching = ref(false) // Bangumi + 角色查询进行中
 
 function applyVn(vn: VndbSearchResult) {
-  // 先用 VNDB 数据快速回填
+  // 先用 VNDB 数据快速回填（用户已经上传自定义封面时，不覆盖封面）
   if (vn.original_title) form.original_title = vn.original_title
   if (vn.id) form.vndb_id = vn.id
-  if (vn.cover_url) form.cover_url = vn.cover_url
+  // 判断用户是否已经上传自定义封面：B2 代理 URL 或非空（且不是 VNDB 的图），则不覆盖
+  const userHasCustomCover = form.cover_url && (
+    form.cover_url.startsWith('/api/b2-image-proxy') ||
+    !form.cover_url.startsWith('http')
+  )
+  if (vn.cover_url && !userHasCustomCover) form.cover_url = vn.cover_url
   if (vn.developer) form.developer = vn.developer
   if (vn.released) form.release_date = vn.released.slice(0, 10)
   if (vn.length_minutes) form.play_duration_hours = Math.round((vn.length_minutes / 60) * 10) / 10
@@ -286,16 +291,16 @@ function splitLines(raw: string): string[] {
 
 function buildPayload(): GameRecordInput | null {
   submitError.value = ''
-  console.log('buildPayload called, cover_url:', form.cover_url, 'cgUrls:', form.cgUrls, 'merchUrls:', form.merchUrls)
+  console.warn('[GameForm][buildPayload] cover_url:', form.cover_url, 'cgUrls:', form.cgUrls, 'merchUrls:', form.merchUrls)
 
   // 校验必填
   if (!form.title.trim()) {
-    console.log('buildPayload: title empty')
+    console.warn('[GameForm][buildPayload] title empty')
     submitError.value = '⚠️ 游戏名称不能为空'
     return null
   }
   if (!form.play_status) {
-    console.log('buildPayload: play_status missing')
+    console.warn('[GameForm][buildPayload] play_status missing')
     submitError.value = '⚠️ 请选择游玩状态'
     return null
   }
@@ -310,13 +315,13 @@ function buildPayload(): GameRecordInput | null {
   // 校验 URL 格式
   const cgCheck = validateImageUrls(cgUrls)
   if (!cgCheck.ok) {
-    console.log('buildPayload: CG URLs invalid at', cgCheck.invalidItems)
+    console.warn('[GameForm][buildPayload] CG URLs invalid at', cgCheck.invalidItems)
     submitError.value = `⚠️ CG 图集第 ${cgCheck.invalidItems.map((i) => i + 1).join(', ')} 个 URL 格式错误`
     return null
   }
   const merchCheck = validateImageUrls(merchUrls)
   if (!merchCheck.ok) {
-    console.log('buildPayload: merch URLs invalid at', merchCheck.invalidItems)
+    console.warn('[GameForm][buildPayload] merch URLs invalid at', merchCheck.invalidItems)
     submitError.value = `⚠️ 周边第 ${merchCheck.invalidItems.map((i) => i + 1).join(', ')} 个 URL 格式错误`
     return null
   }
@@ -370,9 +375,9 @@ function buildPayload(): GameRecordInput | null {
 
 async function onSubmit(e: Event) {
   e.preventDefault()
-  console.log('提交前 form.cover_url:', form.cover_url)
+  console.warn('[GameForm][onSubmit] 提交前 form.cover_url:', form.cover_url)
   const payload = buildPayload()
-  console.log('payload.cover_url:', payload?.cover_url)
+  console.warn('[GameForm][onSubmit] payload.cover_url:', payload?.cover_url)
   if (!payload) return
 
   submitting.value = true

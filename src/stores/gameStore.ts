@@ -233,6 +233,8 @@ export const useGameStore = defineStore('game', {
       if (error) throw error
       const rec = data as GameRecord
       this.records.unshift(rec)
+      // 强制下次 fetchAll 从服务器重新拉取，避免首页读到旧缓存
+      this.lastFetched = null
 
       // 如果有私人笔记，写入独立表
       if (privateNotes && privateNotes.trim()) {
@@ -266,6 +268,8 @@ export const useGameStore = defineStore('game', {
       if (!rec) throw new Error('更新失败：未找到记录')
       const idx = this.records.findIndex((r) => r.id === id)
       if (idx >= 0) this.records[idx] = rec
+      // 强制下次 fetchAll 从服务器重新拉取，确保首页读到最新数据
+      this.lastFetched = null
 
       // 如果 payload 里包含 private_notes，同步到独立表
       if (privateNotes !== undefined) {
