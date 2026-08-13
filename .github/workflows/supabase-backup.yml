@@ -1,20 +1,18 @@
 # =====================================================================
 #   Supabase 数据库定时备份（GitHub Actions）
-#   功能：每天凌晨 3 点（UTC 19:00）使用 pg_dump 将数据库 dump 为 SQL
-#         并上传到 Artifact 保留 30 天
-#   配置：在 GitHub 仓库 Settings → Secrets and variables → Actions
-#         添加下面 4 个 Repository Secrets：
-#         SUPABASE_HOST        例: db.tdwbjahvsonfoawghmrk.supabase.co
-#         SUPABASE_PORT        例: 5432（直连）或 6543（pooler）
-#         SUPABASE_USER        postgres
-#         SUPABASE_PASSWORD    你的数据库密码
+#   功能：每天使用 pg_dump 将数据库 dump 为 SQL 并上传 Artifact
+#   配置：
+#     GitHub Settings → Secrets → Actions 添加：
+#     SUPABASE_HOST        db.tdwbjahvsonfoawghmrk.supabase.co
+#     SUPABASE_PORT        5432（直连）或 6543（pooler）
+#     SUPABASE_PASSWORD    你的数据库密码
 # =====================================================================
 
 name: Supabase DB Backup
 
 on:
   schedule:
-    - cron: '19 23 * * *'   # 每天 UTC 23:19 = 北京时间次日 07:19
+    - cron: '19 23 * * *'
   workflow_dispatch:
 
 jobs:
@@ -35,7 +33,7 @@ jobs:
           PGDATABASE: postgres
           PGHOST: ${{ secrets.SUPABASE_HOST }}
           PGPORT: ${{ secrets.SUPABASE_PORT }}
-          PGUSER: ${{ secrets.SUPABASE_USER }}
+          PGUSER: postgres
           PGPASSWORD: ${{ secrets.SUPABASE_PASSWORD }}
         run: |
           set -euo pipefail
