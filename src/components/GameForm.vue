@@ -286,13 +286,16 @@ function splitLines(raw: string): string[] {
 
 function buildPayload(): GameRecordInput | null {
   submitError.value = ''
+  console.log('buildPayload called, cover_url:', form.cover_url, 'cgUrls:', form.cgUrls, 'merchUrls:', form.merchUrls)
 
   // 校验必填
   if (!form.title.trim()) {
+    console.log('buildPayload: title empty')
     submitError.value = '⚠️ 游戏名称不能为空'
     return null
   }
   if (!form.play_status) {
+    console.log('buildPayload: play_status missing')
     submitError.value = '⚠️ 请选择游玩状态'
     return null
   }
@@ -307,11 +310,13 @@ function buildPayload(): GameRecordInput | null {
   // 校验 URL 格式
   const cgCheck = validateImageUrls(cgUrls)
   if (!cgCheck.ok) {
+    console.log('buildPayload: CG URLs invalid at', cgCheck.invalidItems)
     submitError.value = `⚠️ CG 图集第 ${cgCheck.invalidItems.map((i) => i + 1).join(', ')} 个 URL 格式错误`
     return null
   }
   const merchCheck = validateImageUrls(merchUrls)
   if (!merchCheck.ok) {
+    console.log('buildPayload: merch URLs invalid at', merchCheck.invalidItems)
     submitError.value = `⚠️ 周边第 ${merchCheck.invalidItems.map((i) => i + 1).join(', ')} 个 URL 格式错误`
     return null
   }
