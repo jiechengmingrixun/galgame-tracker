@@ -21,18 +21,12 @@ jobs:
 
       - name: Fetch all table names
         run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq jq
           RESPONSE=$(curl -s \
             -H "apikey: $SUPABASE_ANON_KEY" \
             -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
             "$SUPABASE_URL/rest/v1/")
-          
-          TABLES=$(echo "$RESPONSE" | python3 -c "
-            import json, sys
-            data = json.load(sys.stdin)
-            tables = [p.strip('/') for p in data.get('paths', {}).keys() if p != '/']
-            print('\n'.join(sorted(set(tables))))
-          ")
-          
+          TABLES=$(echo "$RESPONSE" | jq -r '.paths | keys[] | select(. != "/") | gsub("^/"; "")' 2>/dev/null)
           echo "Tables found:"
           echo "$TABLES"
           echo "$TABLES" > tables.txt
@@ -41,20 +35,17 @@ jobs:
         run: |
           mkdir -p "${{ steps.meta.outputs.dir }}"
           TABLES=$(cat tables.txt)
-          
           for TABLE in $TABLES; do
             echo "Exporting $TABLE ..."
             DATA=$(curl -s \
               -H "apikey: $SUPABASE_ANON_KEY" \
               -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
               "$SUPABASE_URL/rest/v1/$TABLE?select=*&limit=50000")
-            
             echo "$DATA" > "${{ steps.meta.outputs.dir }}/${TABLE}.json"
             SIZE=$(stat -c%s "${{ steps.meta.outputs.dir }}/${TABLE}.json")
-            COUNT_ROWS=$(echo "$DATA" | python3 -c "import json,sys; print(len(json.load(sys.stdin)))" 2>/dev/null || echo "0")
+            COUNT_ROWS=$(echo "$DATA" | jq 'length' 2>/dev/null || echo "0")
             echo "  -> $TABLE: ${COUNT_ROWS} rows, ${SIZE} bytes"
           done
-          
           tar -czf "${{ steps.meta.outputs.dir }}.tar.gz" "${{ steps.meta.outputs.dir }}"
           ls -lh "${{ steps.meta.outputs.dir }}.tar.gz"
           echo "Backup complete!"
