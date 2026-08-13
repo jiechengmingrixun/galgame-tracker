@@ -149,7 +149,7 @@ export default async function handler(req: Request): Promise<Response> {
       new PutObjectCommand({
         Bucket: B2_BUCKET_NAME!,
         Key: key,
-        Body: new Blob([buf]),
+        Body: buf,
         ContentType: mime,
       }),
     )
