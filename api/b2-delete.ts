@@ -96,7 +96,7 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   try {
-    const { S3Client, DeleteObjectCommand, HeadObjectCommand } = await import('@aws-sdk/client-s3')
+    const { S3Client, DeleteObjectCommand } = await import('@aws-sdk/client-s3')
     const client = new S3Client({
       region: 'us-west-004',
       endpoint: B2_ENDPOINT!,
@@ -107,20 +107,14 @@ export default async function handler(req: Request): Promise<Response> {
       forcePathStyle: true,
     })
 
-    try {
-      await client.send(new HeadObjectCommand({ Bucket: B2_BUCKET_NAME!, Key: key }))
-    } catch (headErr: any) {
-      const code = headErr?.Code || headErr?.$metadata?.httpStatusCode
-      if (code === 'NotFound' || code === 404) {
-        return json({ success: false, error: 'Object not found' }, 404)
-      }
-      throw headErr
-    }
-
     await client.send(new DeleteObjectCommand({ Bucket: B2_BUCKET_NAME!, Key: key }))
     return json({ success: true }, 200)
-  } catch (err) {
+  } catch (err: any) {
     console.error('[b2-delete]', err)
-    return json({ success: false, error: 'Delete failed: ' + (err as Error).message }, 502)
+    const msg = err?.message || 'Delete failed'
+    if (msg.includes('NotFound') || err?.$metadata?.httpStatusCode === 404) {
+      return json({ success: false, error: 'Object not found' }, 404)
+    }
+    return json({ success: false, error: msg }, 502)
   }
 }
