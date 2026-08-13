@@ -21,7 +21,7 @@ const err = ref('')
 const isAdmin = ref(false)
 const confirmDelete = ref(false)
 
-// 为 RLS 单独查询 private_notes（匿名用户拿到 null，管理员拿到真实内容）
+// 私人笔记已拆到独立表 game_private_notes（RLS 保护：仅 owner 能读到）
 const privateNotes = ref<string | null | undefined>(undefined)
 
 let _reqId = 0
@@ -53,14 +53,15 @@ async function load() {
 
     game.value = data as GameRecord
 
+    // 从独立的 game_private_notes 表查询（RLS 保护：仅 owner 能读到）
     const { data: noteData } = await supabase
-      .from('games')
-      .select('private_notes')
-      .eq('id', id)
+      .from('game_private_notes')
+      .select('notes')
+      .eq('game_id', id)
       .maybeSingle()
 
     if (myReq !== _reqId) return
-    privateNotes.value = (noteData as { private_notes?: string | null } | null)?.private_notes ?? null
+    privateNotes.value = (noteData as { notes?: string | null } | null)?.notes ?? null
 
     isAdmin.value = !!(await getCurrentUser())
   } catch (e) {
