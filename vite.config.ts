@@ -93,10 +93,6 @@ export default defineConfig({
         rewrite: (p) => p.replace(/^\/api\/vndb-proxy/, '/kana'),
       },
       // Bangumi API 代理：/api/bangumi-proxy/* → https://api.bgm.tv/*
-      // 注入 User-Agent 头（浏览器 fetch 不允许设置该头，Bangumi 要求非空 UA）
-      // 注意：国内网络可能因 DNS 污染 / GFW 封锁导致 api.bgm.tv 不可达，
-      //       此时 Bangumi 请求会失败，简介自动回退到 VNDB 英文描述。
-      //       部署到 Vercel 后由 Edge Function 转发，不受此限制。
       '/api/bangumi-proxy': {
         target: 'https://api.bgm.tv',
         changeOrigin: true,
@@ -107,6 +103,19 @@ export default defineConfig({
             proxyReq.setHeader('Accept', 'application/json')
           })
         },
+      },
+      // B2 Edge Functions 本地代理：转发到线上 Vercel 部署
+      '/api/b2-upload': {
+        target: 'https://galgame-tracker.vercel.app',
+        changeOrigin: true,
+      },
+      '/api/b2-delete': {
+        target: 'https://galgame-tracker.vercel.app',
+        changeOrigin: true,
+      },
+      '/api/b2-image-proxy': {
+        target: 'https://galgame-tracker.vercel.app',
+        changeOrigin: true,
       },
     },
   },
