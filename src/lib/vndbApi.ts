@@ -189,33 +189,13 @@ export function proxiedImageUrl(originalUrl: string | null | undefined): string 
 
 /**
  * 通过制作公司 ID 查询公司图标
- * 使用 /producer 端点 + id 过滤器
- * 失败时返回 undefined，不抛异常
+ * ⚠️ 历史注意：VNDB /producer 端点**不存在** `image` 字段（Producer 实体设计上无 Logo）
+ * 因此本函数现在是 no-op，始终返回 undefined。
+ * 生产环境改走 Bangumi 机构搜索 → fetchProducerIconFromBangumi()。
+ * 保留本函数仅为避免老代码调用方 break。
  */
-export async function fetchProducerIcon(producerId: string): Promise<string | undefined> {
-  if (!producerId) return undefined
-
-  try {
-    const resp = await fetch(`${API_BASE}/producer`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({
-        filters: ['id', '=', producerId],
-        fields: 'image',
-        results: 1,
-      }),
-      signal: AbortSignal.timeout(10000),
-    })
-
-    if (!resp.ok) {
-      return undefined
-    }
-
-    const json = (await resp.json()) as { results?: Array<{ image?: string | null }> }
-    return json.results?.[0]?.image ?? undefined
-  } catch {
-    return undefined
-  }
+export async function fetchProducerIcon(_producerId: string): Promise<string | undefined> {
+  return undefined
 }
 
 /**

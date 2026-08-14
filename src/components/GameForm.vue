@@ -9,8 +9,8 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { searchVn, fetchCharactersByVnId, fetchProducerIcon, proxiedImageUrl, type VndbSearchResult } from '@/lib/vndbApi'
-import { searchBangumi } from '@/lib/bangumiApi'
+import { searchVn, fetchCharactersByVnId, proxiedImageUrl, type VndbSearchResult } from '@/lib/vndbApi'
+import { searchBangumi, fetchProducerIconFromBangumi } from '@/lib/bangumiApi'
 import { mergeGameData, type DataSource } from '@/lib/sourceMerge'
 import { validateImageUrls } from '@/lib/b2Helper'
 import { useGameStore } from '@/stores/gameStore'
@@ -133,14 +133,13 @@ async function doSearch() {
   vndbError.value = ''
   try {
     const results = await searchVn(searchKw.value)
-    // 并行获取所有搜索结果的制作公司图标（静默忽略失败，最多 15 条）
+    // 并行获取所有搜索结果的制作公司图标（通过 Bangumi 机构搜索，VNDB Producer 无 image 字段）
     const iconPromises = results.map(async (r) => {
-      if (r.developer_id) {
-        const icon = await fetchProducerIcon(r.developer_id)
+      if (r.developer) {
+        const icon = await fetchProducerIconFromBangumi(r.developer)
         if (icon) r.developer_icon = icon
       }
     })
-    // 最多等 5 秒，不阻塞后续交互
     await Promise.allSettled(iconPromises).catch(() => {})
     searchResults.value = results
   } catch (e) {
@@ -196,10 +195,15 @@ async function enrichGameData(vn: VndbSearchResult) {
   enriching.value = true
 
   const searchKey = vn.original_title || vn.title
+  // 并行：Bangumi 游戏搜中文名/简介 + VNDB 角色 + Bangumi 机构搜制作公司图标
+  // 注意：VNDB Producer 实体无 image 字段，因此改走 Bangumi 按公司名搜索
+  const producerName = vn.developer || form.developer
   const [bangumiResult, characters, producerIcon] = await Promise.all([
     searchBangumi(searchKey),
     fetchCharactersByVnId(vn.id),
-    vn.developer_id ? fetchProducerIcon(vn.developer_id) : Promise.resolve(undefined),
+    producerName && !vn.developer_icon
+      ? fetchProducerIconFromBangumi(producerName)
+      : Promise.resolve(vn.developer_icon || undefined),
   ])
 
   const merged = mergeGameData(vn, bangumiResult)
@@ -507,6 +511,9 @@ async function onSubmit(e: Event) {
               referrerpolicy="no-referrer"
             />
             <input v-model="form.developer" class="input-field flex-1" placeholder="例：Key" />
+          </div>
+          <div class="mt-2">
+            <ImageUploader v-model="form.developer_icon" label="上传/替换制作组图标" />
           </div>
         </div>
         <div>

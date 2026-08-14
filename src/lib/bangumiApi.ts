@@ -14,6 +14,58 @@ export interface BangumiResult {
   name: string         // 原始名称（日文/英文）
   name_cn: string      // 中文名称（可能为空）
   summary: string      // 简介
+  /** 图标 / 封面（搜索结果不一定有，详情接口更可靠，可能为 null） */
+  images?: {
+    small?: string | null
+    grid?: string | null
+    large?: string | null
+    medium?: string | null
+    common?: string | null
+  } | null
+}
+
+/** Bangumi subject type：7 = 机构/公司（含游戏厂牌、出版社等） */
+const SUBJECT_TYPE_ORGANIZATION = 7
+
+/**
+ * 按「制作公司名」在 Bangumi 搜索机构条目，返回最佳匹配的 Logo URL。
+ * 未找到或无图时返回 null。
+ */
+export async function fetchProducerIconFromBangumi(producerName: string): Promise<string | null> {
+  const trimmed = producerName.trim()
+  if (!trimmed) return null
+
+  try {
+    const resp = await fetch(`${API_BASE}/v0/search/subjects?limit=5`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        keyword: trimmed,
+        filter: { type: [SUBJECT_TYPE_ORGANIZATION] },
+        sort: 'match',
+      }),
+      signal: AbortSignal.timeout(8000),
+    })
+
+    if (!resp.ok) return null
+
+    const json = (await resp.json()) as { data?: BangumiResult[] }
+    const list = (json.data ?? []).filter((x) => x.images?.medium || x.images?.large || x.images?.common)
+    if (list.length === 0) return null
+
+    // 优先精确匹配（去掉大小写/空格差异）
+    const norm = (s: string) => s.toLowerCase().replace(/[\s\-・]/g, '')
+    const exact = list.find(
+      (r) => norm(r.name) === norm(trimmed) || norm(r.name_cn) === norm(trimmed),
+    )
+    const best = exact ?? list[0]
+    return best.images?.medium || best.images?.large || best.images?.common || best.images?.small || null
+  } catch {
+    return null
+  }
 }
 
 /**
