@@ -96,7 +96,12 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   try {
-    const { S3Client, DeleteObjectCommand, HeadObjectCommand } = await import('@aws-sdk/client-s3')
+    const {
+      S3Client,
+      DeleteObjectCommand,
+      HeadObjectCommand,
+      ListObjectVersionsCommand,
+    } = await import('@aws-sdk/client-s3')
     const client = new S3Client({
       region: 'us-west-004',
       endpoint: B2_ENDPOINT,
@@ -107,29 +112,69 @@ export default async function handler(req: Request): Promise<Response> {
       forcePathStyle: true,
     })
 
-    // Step 1: 验证文件确实存在（HEAD 检查）
+    // Step 1: 列出该 key 的所有版本（含 delete marker）—— 解决 B2 版本控制导致 DeleteObject 只加标记的问题
+    let versions: Array<{ VersionId?: string; Key?: string; IsLatest?: boolean; IsDeleteMarker?: boolean }> = []
     try {
-      const headResp = await client.send(new HeadObjectCommand({ Bucket: B2_BUCKET_NAME, Key: key }))
-      console.warn(`[b2-delete] HEAD before delete: bucket=${B2_BUCKET_NAME} key=${key} exists=true size=${headResp.ContentLength}`)
-    } catch (headErr: any) {
-      const code = headErr?.$metadata?.httpStatusCode || headErr?.name || headErr?.message
-      console.warn(`[b2-delete] HEAD before delete: bucket=${B2_BUCKET_NAME} key=${key} exists=false error=${code}`)
+      const listResp = await client.send(
+        new ListObjectVersionsCommand({ Bucket: B2_BUCKET_NAME, Prefix: key })
+      )
+      versions = [
+        ...(listResp.Versions || []),
+        ...(listResp.DeleteMarkers || []).map((m) => ({ ...m, IsDeleteMarker: true })),
+      ].filter((v) => v.Key === key)
+      console.warn(`[b2-delete] ListVersions: key=${key} found=${versions.length} versions=${JSON.stringify(versions.map((v) => ({ v: v.VersionId, latest: v.IsLatest, marker: v.IsDeleteMarker })))}`)
+    } catch (listErr: any) {
+      console.warn(`[b2-delete] ListVersions skipped/failed: key=${key} msg=${listErr?.message || listErr}`)
     }
 
-    // Step 2: 执行删除
-    const deleteResp = await client.send(new DeleteObjectCommand({ Bucket: B2_BUCKET_NAME, Key: key }))
-    console.warn(`[b2-delete] DELETE success: bucket=${B2_BUCKET_NAME} key=${key} httpStatus=${deleteResp.$metadata?.httpStatusCode}`)
+    // Step 2: 如果有版本（开启了版本控制），按 VersionId 逐个物理删除所有版本和 delete marker
+    if (versions.length > 0) {
+      for (const v of versions) {
+        if (!v.VersionId) continue
+        try {
+          const dvResp = await client.send(
+            new DeleteObjectCommand({ Bucket: B2_BUCKET_NAME, Key: key, VersionId: v.VersionId })
+          )
+          console.warn(`[b2-delete] DELETE VERSION: key=${key} versionId=${v.VersionId} isMarker=${v.IsDeleteMarker} httpStatus=${dvResp.$metadata?.httpStatusCode}`)
+        } catch (dvErr: any) {
+          console.warn(`[b2-delete] DELETE VERSION failed: key=${key} versionId=${v.VersionId} msg=${dvErr?.message || dvErr}`)
+        }
+      }
+    } else {
+      // Step 2b: 没有版本信息（桶未开启版本控制），普通 DeleteObject
+      const deleteResp = await client.send(new DeleteObjectCommand({ Bucket: B2_BUCKET_NAME, Key: key }))
+      console.warn(`[b2-delete] DELETE plain (no versioning): bucket=${B2_BUCKET_NAME} key=${key} httpStatus=${deleteResp.$metadata?.httpStatusCode}`)
+    }
 
-    // Step 3: 验证删除后文件确实不存在
+    // Step 3: 验证删除后文件确实不存在（双重确认）
+    // 3a. 再列一次版本，应该为空
+    try {
+      const verifyList = await client.send(
+        new ListObjectVersionsCommand({ Bucket: B2_BUCKET_NAME, Prefix: key })
+      )
+      const remaining = [
+        ...(verifyList.Versions || []),
+        ...(verifyList.DeleteMarkers || []),
+      ].filter((v) => v.Key === key)
+      if (remaining.length > 0) {
+        console.warn(`[b2-delete] VERIFY FAILED: key=${key} STILL HAS ${remaining.length} VERSIONS after delete!`, JSON.stringify(remaining.map((r) => r.VersionId)))
+        return json({ success: false, error: `Versions remaining: ${remaining.length}` }, 502)
+      } else {
+        console.warn(`[b2-delete] VERIFY LIST OK: key=${key} no versions left`)
+      }
+    } catch (verifyErr: any) {
+      console.warn(`[b2-delete] VERIFY LIST skipped/failed: key=${key} msg=${verifyErr?.message || verifyErr}`)
+    }
+    // 3b. HEAD 也确认 404
     try {
       await client.send(new HeadObjectCommand({ Bucket: B2_BUCKET_NAME, Key: key }))
-      console.warn(`[b2-delete] VERIFY FAILED: key=${key} STILL EXISTS after delete!`)
-      return json({ success: false, error: 'Delete executed but file still exists (possible versioning)' }, 502)
+      console.warn(`[b2-delete] VERIFY HEAD FAILED: key=${key} HEAD still returns 200!`)
+      return json({ success: false, error: 'HEAD still succeeds (possible B2 consistency lag)' }, 502)
     } catch {
-      console.warn(`[b2-delete] VERIFY OK: key=${key} confirmed deleted`)
+      console.warn(`[b2-delete] VERIFY HEAD OK: key=${key} returns 404`)
     }
 
-    return json({ success: true, key }, 200)
+    return json({ success: true, key, deletedVersions: versions.length }, 200)
   } catch (err: any) {
     console.error('[b2-delete] ERROR:', { key, msg: err?.message, status: err?.$metadata?.httpStatusCode, err })
     const msg = err?.message || 'Delete failed'
