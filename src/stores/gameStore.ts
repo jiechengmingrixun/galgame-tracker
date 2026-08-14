@@ -271,26 +271,28 @@ export const useGameStore = defineStore('game', {
 
     /** 更新（需管理员） */
     async updateRecord(id: string, payload: Partial<GameRecordInput>): Promise<GameRecord> {
-      const { data: sessionData } = await supabase.auth.getSession()
-      const hasSession = !!sessionData.session
-      console.error('[gameStore.updateRecord] hasSession:', hasSession, 'id:', id)
+      // 1) 用 getUser() 真正验证 JWT（getSession() 只检查本地存储，不验证有效性）
+      const { data: userData, error: userError } = await supabase.auth.getUser()
+      const hasValidUser = !!userData.user
+      console.error('[gameStore.updateRecord] hasValidUser:', hasValidUser, 'userError:', userError?.message, 'id:', id)
 
-      if (!hasSession) {
-        throw new Error('登录状态已失效，请重新登录')
+      if (!hasValidUser) {
+        // JWT 已过期或无效，清除本地 session 强制重新登录
+        await supabase.auth.signOut()
+        throw new Error('登录状态已失效，请重新登录后再试')
       }
 
       // private_notes 已拆到独立表，不更新 games 表
       const privateNotes = payload.private_notes
       const { private_notes: _removed, ...rawPayload } = payload
 
-      // DB 白名单：只保留 games 表中实际存在的列，过滤掉 cg_progress 等扩展字段
-      // （cg_progress 在 SQL 里需手动 ALTER TABLE 添加）
+      // DB 白名单：只保留 games 表中实际存在的列
       const DB_COLUMNS = new Set([
         'title', 'original_title', 'vndb_id', 'cover_url', 'developer',
         'scenario_writers', 'artists', 'characters', 'release_date',
         'play_status', 'personal_rating', 'play_duration_hours',
         'start_date', 'finish_date', 'tags',
-        'synopsis',
+        'synopsis', 'cg_progress',
         'screenshot_urls', 'cg_urls', 'merch_urls',
       ])
       const payloadWithoutNotes: Record<string, unknown> = { updated_at: new Date().toISOString() }
