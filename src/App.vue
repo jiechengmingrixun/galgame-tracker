@@ -93,7 +93,8 @@ onMounted(async () => {
     </main>
 
     <footer class="relative z-10 mt-16 py-6 text-center text-xs text-slate-400">
-      <p>Made with 🌷 · 个人 Galgame 回忆台账</p>
+      <p>我喜欢上了你 于是我买了日记</p>
+      <p>——为了维系与花儿共飞散的光阴</p>
     </footer>
 
     <!-- 全局看板娘 -->
