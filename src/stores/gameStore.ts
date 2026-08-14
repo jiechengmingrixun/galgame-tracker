@@ -128,16 +128,20 @@ export const useGameStore = defineStore('game', {
       return base
     },
 
-    /** 制作组列表（含游戏数量，count > 0 才返回） */
-    groupDeveloperList(state): Array<{ name: string; count: number }> {
-      const map = new Map<string, number>()
+    /** 制作组列表（含游戏数量 + 图标，count > 0 才返回）
+     *  按制作组名合并，取该组任意一条记录中有 icon 的图即可
+     */
+    groupDeveloperList(state): Array<{ name: string; count: number; icon: string | null }> {
+      const map = new Map<string, { count: number; icon: string | null }>()
       state.records.forEach((r) => {
         const dev = r.developer?.trim()
         if (!dev) return
-        map.set(dev, (map.get(dev) ?? 0) + 1)
+        const prev = map.get(dev)
+        const icon = prev?.icon || r.developer_icon?.trim() || null
+        map.set(dev, { count: (prev?.count ?? 0) + 1, icon })
       })
       return Array.from(map.entries())
-        .map(([name, count]) => ({ name, count }))
+        .map(([name, { count, icon }]) => ({ name, count, icon }))
         .filter((d) => d.count > 0)
         .sort((a, b) => b.count - a.count)
     },

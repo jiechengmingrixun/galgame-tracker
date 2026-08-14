@@ -10,6 +10,7 @@ import FilterBar from '@/components/FilterBar.vue'
 import { useGameStore } from '@/stores/gameStore'
 import type { PlayStatus, SortKey } from '@/types/game'
 import { getCurrentUser } from '@/lib/supabaseClient'
+import { proxiedImageUrl } from '@/lib/vndbApi'
 
 const store = useGameStore()
 
@@ -161,9 +162,16 @@ const activeFilters = computed(() => {
             : 'opacity-80 hover:opacity-100 border-2 border-transparent'"
           @click="toggleDeveloper(dev.name)"
         >
-          <!-- 制作组 logo（占位头像） -->
-          <div class="w-12 h-12 rounded-full bg-gradient-to-br from-sakura-200 to-lavender-200 flex items-center justify-center text-lg font-bold text-slate-600 shrink-0">
-            {{ dev.name.charAt(0) }}
+          <!-- 制作组 logo（真图 or fallback 首字母） -->
+          <div class="w-12 h-12 rounded-full overflow-hidden bg-gradient-to-br from-sakura-200 to-lavender-200 flex items-center justify-center shrink-0 border border-white/60">
+            <img
+              v-if="dev.icon"
+              :src="proxiedImageUrl(dev.icon)"
+              class="w-full h-full object-contain bg-white"
+              referrerpolicy="no-referrer"
+              :alt="dev.name"
+            />
+            <span v-else class="text-lg font-bold text-slate-600">{{ dev.name.charAt(0) }}</span>
           </div>
           <div class="text-center w-full min-w-0">
             <div class="text-sm font-medium text-slate-700 truncate">{{ dev.name }}</div>

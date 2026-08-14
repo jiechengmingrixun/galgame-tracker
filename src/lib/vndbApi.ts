@@ -18,6 +18,7 @@ export interface VndbSearchResult {
   cover_url: string
   developer: string
   developer_id: string
+  /** 制作公司图标（VNDB /producer 端点异步补充，初始为空字符串，doSearch 后会填充） */
   developer_icon: string
   released: string
   length_minutes: number | null

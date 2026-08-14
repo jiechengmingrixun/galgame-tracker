@@ -132,7 +132,17 @@ async function doSearch() {
   searching.value = true
   vndbError.value = ''
   try {
-    searchResults.value = await searchVn(searchKw.value)
+    const results = await searchVn(searchKw.value)
+    // 并行获取所有搜索结果的制作公司图标（静默忽略失败，最多 15 条）
+    const iconPromises = results.map(async (r) => {
+      if (r.developer_id) {
+        const icon = await fetchProducerIcon(r.developer_id)
+        if (icon) r.developer_icon = icon
+      }
+    })
+    // 最多等 5 秒，不阻塞后续交互
+    await Promise.allSettled(iconPromises).catch(() => {})
+    searchResults.value = results
   } catch (e) {
     vndbError.value = (e as Error).message
     searchResults.value = []
@@ -170,6 +180,9 @@ function applyVn(vn: VndbSearchResult) {
   form.synopsis = vn.short_desc
   titleSource.value = vn.zh_title ? 'vndb' : 'none'
   synopsisSource.value = vn.short_desc ? 'vndb' : 'none'
+
+  // doSearch 可能已经并发获取了 producer_icon，先立即使用
+  if (vn.developer_icon) form.developer_icon = vn.developer_icon
 
   // 异步 enrichment：Bangumi 中文名+简介 + VNDB 角色列表
   enrichGameData(vn)
