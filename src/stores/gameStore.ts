@@ -281,12 +281,31 @@ export const useGameStore = defineStore('game', {
 
       // private_notes 已拆到独立表，不更新 games 表
       const privateNotes = payload.private_notes
-      const { private_notes: _removed, ...payloadWithoutNotes } = payload
+      const { private_notes: _removed, ...rawPayload } = payload
+
+      // DB 白名单：只保留 games 表中实际存在的列，过滤掉 cg_progress 等扩展字段
+      // （cg_progress 在 SQL 里需手动 ALTER TABLE 添加）
+      const DB_COLUMNS = new Set([
+        'title', 'original_title', 'vndb_id', 'cover_url', 'developer',
+        'scenario_writers', 'artists', 'characters', 'release_date',
+        'play_status', 'personal_rating', 'play_duration_hours',
+        'start_date', 'finish_date', 'tags',
+        'synopsis',
+        'screenshot_urls', 'cg_urls', 'merch_urls',
+      ])
+      const payloadWithoutNotes: Record<string, unknown> = { updated_at: new Date().toISOString() }
+      for (const [key, value] of Object.entries(rawPayload)) {
+        if (DB_COLUMNS.has(key)) {
+          payloadWithoutNotes[key] = value
+        } else {
+          console.error('[gameStore.updateRecord] 过滤掉 DB 不存在的列:', key)
+        }
+      }
 
       // 先更新，用 .select() 链式调用来检测受影响行数
       const { data: updatedRows, error: updateError } = await supabase
         .from(TABLE_NAME)
-        .update({ ...payloadWithoutNotes, updated_at: new Date().toISOString() } as never)
+        .update(payloadWithoutNotes as never)
         .eq('id', id)
         .select('id')
 
