@@ -356,9 +356,30 @@ export const useGameStore = defineStore('game', {
 
     /** 删除（需管理员），同时清理 B2 图片 */
     async deleteRecord(id: string): Promise<void> {
-      const rec = this.records.find((r) => r.id === id)
+      // 与 updateRecord 保持一致：用 getUser() 真实验证 JWT（避免本地 session 未过期但服务端 JWT 已失效）
+      const { data: userData } = await supabase.auth.getUser()
+      if (!userData.user) {
+        await supabase.auth.signOut()
+        throw new Error('登录状态已失效，请重新登录后再试')
+      }
+      // 拿到真实有效的 access_token（getSession 不可靠，但 getUser 通过后 token 大概率可用）
       const { data: sessionData } = await supabase.auth.getSession()
       const token = sessionData.session?.access_token
+
+      // 优先用缓存中的记录；缓存找不到（如详情页未加载列表）时，回退查库取一次，防止漏删 B2 图片
+      let rec: GameRecord | undefined = this.records.find((r) => r.id === id)
+      if (!rec) {
+        try {
+          const { data } = await supabase
+            .from(TABLE_NAME)
+            .select('cover_url, cg_urls, merch_urls')
+            .eq('id', id)
+            .maybeSingle()
+          if (data) rec = data as GameRecord
+        } catch (e) {
+          console.warn('[gameStore][deleteRecord] fallback select failed:', e)
+        }
+      }
 
       if (rec && token) {
         const urlsToClean: string[] = []
@@ -370,12 +391,23 @@ export const useGameStore = defineStore('game', {
           const key = getKeyFromProxyUrl(url)
           if (!key) continue
           try {
-            await fetch(`/api/b2-delete?fileKey=${encodeURIComponent(key)}`, {
+            const resp = await fetch(`/api/b2-delete?fileKey=${encodeURIComponent(key)}`, {
               method: 'DELETE',
               headers: { Authorization: `Bearer ${token}` },
             })
-          } catch { /* 静默忽略清理失败 */ }
+            if (!resp.ok) {
+              const data = (await resp.json().catch(() => ({}))) as { error?: string }
+              console.warn('[gameStore][deleteRecord] b2-delete failed:',
+                { key, status: resp.status, error: data.error || resp.statusText })
+            }
+          } catch (e) {
+            console.warn('[gameStore][deleteRecord] b2-delete exception:', { key, msg: (e as Error).message })
+          }
         }
+      } else if (!token) {
+        console.warn('[gameStore][deleteRecord] skip B2 cleanup: no valid token')
+      } else if (!rec) {
+        console.warn('[gameStore][deleteRecord] skip B2 cleanup: record not found in cache & DB')
       }
 
       const { error } = await supabase.from(TABLE_NAME).delete().eq('id', id)
