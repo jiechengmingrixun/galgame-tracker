@@ -271,13 +271,10 @@ export const useGameStore = defineStore('game', {
 
     /** 更新（需管理员） */
     async updateRecord(id: string, payload: Partial<GameRecordInput>): Promise<GameRecord> {
-      // 1) 用 getUser() 真正验证 JWT（getSession() 只检查本地存储，不验证有效性）
-      const { data: userData, error: userError } = await supabase.auth.getUser()
-      const hasValidUser = !!userData.user
-      console.error('[gameStore.updateRecord] hasValidUser:', hasValidUser, 'userError:', userError?.message, 'id:', id)
-
-      if (!hasValidUser) {
-        // JWT 已过期或无效，清除本地 session 强制重新登录
+      // 用 getUser() 真正验证 JWT（getSession() 只检查本地存储，不验证有效性）
+      // RLS UPDATE 策略要求 auth.role()='authenticated'，过期 JWT 角色变 anon 会被静默阻止
+      const { data: userData } = await supabase.auth.getUser()
+      if (!userData.user) {
         await supabase.auth.signOut()
         throw new Error('登录状态已失效，请重新登录后再试')
       }
@@ -299,33 +296,21 @@ export const useGameStore = defineStore('game', {
       for (const [key, value] of Object.entries(rawPayload)) {
         if (DB_COLUMNS.has(key)) {
           payloadWithoutNotes[key] = value
-        } else {
-          console.error('[gameStore.updateRecord] 过滤掉 DB 不存在的列:', key)
         }
       }
 
-      // 先更新，用 .select() 链式调用来检测受影响行数
-      console.error('[gameStore.updateRecord] update payload:', JSON.stringify(payloadWithoutNotes))
       const { data: updatedRows, error: updateError } = await supabase
         .from(TABLE_NAME)
         .update(payloadWithoutNotes as never)
         .eq('id', id)
         .select('id')
 
-      console.error('[gameStore.updateRecord] update result rows:', updatedRows?.length ?? 0, 'error:', updateError?.message)
-
       if (updateError) throw updateError
       if (!updatedRows || updatedRows.length === 0) {
-        // 尝试不带 .select() 看看是不是 RLS 阻塞
-        const { count, error: countError } = await supabase
-          .from(TABLE_NAME)
-          .select('*', { count: 'exact', head: true })
-          .eq('id', id)
-        console.error('[gameStore.updateRecord] row count for id:', count, 'countError:', countError?.message)
         throw new Error(`更新失败：未找到 id=${id} 的记录（可能是 RLS 权限或 ID 不匹配）`)
       }
 
-      // 再查询回结果（读取完整数据）
+      // 再查询回结果
       const { data, error: selectError } = await supabase
         .from(TABLE_NAME)
         .select('*')
@@ -343,10 +328,8 @@ export const useGameStore = defineStore('game', {
       }
       const idx = this.records.findIndex((r) => r.id === id)
       if (idx >= 0) this.records[idx] = rec
-      // 强制下次 fetchAll 从服务器重新拉取，确保首页读到最新数据
       this.lastFetched = null
 
-      // 如果 payload 里包含 private_notes，同步到独立表
       if (privateNotes !== undefined) {
         await this.savePrivateNotes(id, privateNotes)
       }
