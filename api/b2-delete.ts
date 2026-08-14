@@ -96,7 +96,7 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   try {
-    const { S3Client, DeleteObjectCommand } = await import('@aws-sdk/client-s3')
+    const { S3Client, DeleteObjectCommand, HeadObjectCommand } = await import('@aws-sdk/client-s3')
     const client = new S3Client({
       region: 'us-west-004',
       endpoint: B2_ENDPOINT,
@@ -107,10 +107,31 @@ export default async function handler(req: Request): Promise<Response> {
       forcePathStyle: true,
     })
 
-    await client.send(new DeleteObjectCommand({ Bucket: B2_BUCKET_NAME, Key: key }))
-    return json({ success: true }, 200)
+    // Step 1: 验证文件确实存在（HEAD 检查）
+    try {
+      const headResp = await client.send(new HeadObjectCommand({ Bucket: B2_BUCKET_NAME, Key: key }))
+      console.warn(`[b2-delete] HEAD before delete: bucket=${B2_BUCKET_NAME} key=${key} exists=true size=${headResp.ContentLength}`)
+    } catch (headErr: any) {
+      const code = headErr?.$metadata?.httpStatusCode || headErr?.name || headErr?.message
+      console.warn(`[b2-delete] HEAD before delete: bucket=${B2_BUCKET_NAME} key=${key} exists=false error=${code}`)
+    }
+
+    // Step 2: 执行删除
+    const deleteResp = await client.send(new DeleteObjectCommand({ Bucket: B2_BUCKET_NAME, Key: key }))
+    console.warn(`[b2-delete] DELETE success: bucket=${B2_BUCKET_NAME} key=${key} httpStatus=${deleteResp.$metadata?.httpStatusCode}`)
+
+    // Step 3: 验证删除后文件确实不存在
+    try {
+      await client.send(new HeadObjectCommand({ Bucket: B2_BUCKET_NAME, Key: key }))
+      console.warn(`[b2-delete] VERIFY FAILED: key=${key} STILL EXISTS after delete!`)
+      return json({ success: false, error: 'Delete executed but file still exists (possible versioning)' }, 502)
+    } catch {
+      console.warn(`[b2-delete] VERIFY OK: key=${key} confirmed deleted`)
+    }
+
+    return json({ success: true, key }, 200)
   } catch (err: any) {
-    console.error('[b2-delete]', err)
+    console.error('[b2-delete] ERROR:', { key, msg: err?.message, status: err?.$metadata?.httpStatusCode, err })
     const msg = err?.message || 'Delete failed'
     if (msg.includes('NotFound') || err?.$metadata?.httpStatusCode === 404) {
       return json({ success: false, error: 'Object not found' }, 404)

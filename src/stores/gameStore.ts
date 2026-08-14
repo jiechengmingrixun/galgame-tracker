@@ -376,6 +376,7 @@ export const useGameStore = defineStore('game', {
             .eq('id', id)
             .maybeSingle()
           if (data) rec = data as GameRecord
+          console.warn('[gameStore][deleteRecord] fallback query:', { id, found: !!rec })
         } catch (e) {
           console.warn('[gameStore][deleteRecord] fallback select failed:', e)
         }
@@ -387,19 +388,22 @@ export const useGameStore = defineStore('game', {
         rec.cg_urls?.forEach((u) => { if (u.startsWith('/api/b2-image-proxy')) urlsToClean.push(u) })
         rec.merch_urls?.forEach((u) => { if (u.startsWith('/api/b2-image-proxy')) urlsToClean.push(u) })
 
+        console.warn('[gameStore][deleteRecord] start cleanup:', { id, totalImages: urlsToClean.length })
+        if (rec.cover_url) console.warn('[gameStore][deleteRecord] cover_url:', rec.cover_url)
+        if (rec.cg_urls?.length) console.warn('[gameStore][deleteRecord] cg_urls:', rec.cg_urls)
+        if (rec.merch_urls?.length) console.warn('[gameStore][deleteRecord] merch_urls:', rec.merch_urls)
+
         for (const url of urlsToClean) {
           const key = getKeyFromProxyUrl(url)
+          console.warn('[gameStore][deleteRecord] deleting:', { url, extractedKey: key })
           if (!key) continue
           try {
             const resp = await fetch(`/api/b2-delete?fileKey=${encodeURIComponent(key)}`, {
               method: 'DELETE',
               headers: { Authorization: `Bearer ${token}` },
             })
-            if (!resp.ok) {
-              const data = (await resp.json().catch(() => ({}))) as { error?: string }
-              console.warn('[gameStore][deleteRecord] b2-delete failed:',
-                { key, status: resp.status, error: data.error || resp.statusText })
-            }
+            const body = await resp.json().catch(() => ({})) as { error?: string; key?: string }
+            console.warn('[gameStore][deleteRecord] b2-delete result:', { key, status: resp.status, body })
           } catch (e) {
             console.warn('[gameStore][deleteRecord] b2-delete exception:', { key, msg: (e as Error).message })
           }
