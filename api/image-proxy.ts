@@ -9,7 +9,17 @@ export const config = {
   runtime: 'edge',
 }
 
-const ALLOWED_HOSTS = ['t.vndb.org', 's2.vndb.org', 'vndb.org', 'www.vndb.org']
+const ALLOWED_HOSTS = [
+  // VNDB 图片（封面等）
+  't.vndb.org',
+  's2.vndb.org',
+  'vndb.org',
+  'www.vndb.org',
+  // Bangumi 图片（制作公司 Logo、游戏封面、角色立绘）
+  'lain.bgm.tv',
+  'bgm.tv',
+  'api.bgm.tv',
+]
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024 // 10MB
 
 export default async function handler(req: Request): Promise<Response> {

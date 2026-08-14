@@ -14,7 +14,7 @@ export interface BangumiResult {
   name: string         // 原始名称（日文/英文）
   name_cn: string      // 中文名称（可能为空）
   summary: string      // 简介
-  /** 图标 / 封面（搜索结果不一定有，详情接口更可靠，可能为 null） */
+  /** 图标 / 封面 */
   images?: {
     small?: string | null
     grid?: string | null
@@ -22,13 +22,12 @@ export interface BangumiResult {
     medium?: string | null
     common?: string | null
   } | null
+  image?: string | null
 }
 
-/** Bangumi subject type：7 = 机构/公司（含游戏厂牌、出版社等） */
-const SUBJECT_TYPE_ORGANIZATION = 7
-
 /**
- * 按「制作公司名」在 Bangumi 搜索机构条目，返回最佳匹配的 Logo URL。
+ * 按「制作公司名」在 Bangumi 人物库搜索，返回最佳匹配的 Logo URL。
+ * Bangumi 把制作厂牌归类在 /v0/search/persons 下（不是 subjects，也没有 type=7）。
  * 未找到或无图时返回 null。
  */
 export async function fetchProducerIconFromBangumi(producerName: string): Promise<string | null> {
@@ -36,7 +35,7 @@ export async function fetchProducerIconFromBangumi(producerName: string): Promis
   if (!trimmed) return null
 
   try {
-    const resp = await fetch(`${API_BASE}/v0/search/subjects?limit=5`, {
+    const resp = await fetch(`${API_BASE}/v0/search/persons`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -44,7 +43,6 @@ export async function fetchProducerIconFromBangumi(producerName: string): Promis
       },
       body: JSON.stringify({
         keyword: trimmed,
-        filter: { type: [SUBJECT_TYPE_ORGANIZATION] },
         sort: 'match',
       }),
       signal: AbortSignal.timeout(8000),
@@ -53,16 +51,35 @@ export async function fetchProducerIconFromBangumi(producerName: string): Promis
     if (!resp.ok) return null
 
     const json = (await resp.json()) as { data?: BangumiResult[] }
-    const list = (json.data ?? []).filter((x) => x.images?.medium || x.images?.large || x.images?.common)
-    if (list.length === 0) return null
-
-    // 优先精确匹配（去掉大小写/空格差异）
-    const norm = (s: string) => s.toLowerCase().replace(/[\s\-・]/g, '')
-    const exact = list.find(
-      (r) => norm(r.name) === norm(trimmed) || norm(r.name_cn) === norm(trimmed),
+    const list = json.data ?? []
+    // 过滤有图片的（image 或 images.medium 等任一可用）
+    const withImg = list.filter(
+      (x) =>
+        x.image ||
+        x.images?.medium ||
+        x.images?.large ||
+        x.images?.common ||
+        x.images?.grid ||
+        x.images?.small,
     )
-    const best = exact ?? list[0]
-    return best.images?.medium || best.images?.large || best.images?.common || best.images?.small || null
+    if (withImg.length === 0) return null
+
+    // 精确匹配优先
+    const norm = (s: string) => s.toLowerCase().replace(/[\s\-・]/g, '')
+    const exact = withImg.find(
+      (r) => norm(r.name) === norm(trimmed) || norm(r.name_cn || '') === norm(trimmed),
+    )
+    const best = exact ?? withImg[0]
+
+    return (
+      best.images?.medium ||
+      best.images?.large ||
+      best.images?.common ||
+      best.images?.grid ||
+      best.images?.small ||
+      best.image ||
+      null
+    )
   } catch {
     return null
   }

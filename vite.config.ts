@@ -11,7 +11,17 @@ import path from 'node:path'
  *  - 返回图片二进制流
  */
 function localImageProxy(): Plugin {
-  const ALLOWED_HOSTS = ['t.vndb.org', 's2.vndb.org', 'vndb.org', 'www.vndb.org']
+  const ALLOWED_HOSTS = [
+    // VNDB 图片
+    't.vndb.org',
+    's2.vndb.org',
+    'vndb.org',
+    'www.vndb.org',
+    // Bangumi 图片
+    'lain.bgm.tv',
+    'bgm.tv',
+    'api.bgm.tv',
+  ]
 
   return {
     name: 'local-image-proxy',
