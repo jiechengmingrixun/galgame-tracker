@@ -119,7 +119,7 @@ export default async function handler(req: Request): Promise<Response> {
       apiUrl = authJson.apiUrl
       authToken = authJson.authorizationToken
       accountId = authJson.accountId
-      console.warn(`[b2-delete] b2_authorize_account OK: accountId=${accountId} apiUrl=${apiUrl}`)
+      console.log(`[b2-delete] b2_authorize_account OK: accountId=${accountId}`)
     } catch (e: any) {
       console.error(`[b2-delete] b2_authorize_account EXCEPTION: msg=${e?.message || e}`)
       return json({ success: false, error: `B2 authorize exception: ${e?.message || e}` }, 502)
@@ -144,7 +144,7 @@ export default async function handler(req: Request): Promise<Response> {
         return json({ success: false, error: `Bucket not found: ${B2_BUCKET_NAME}` }, 502)
       }
       bucketId = bucket.bucketId
-      console.warn(`[b2-delete] b2_list_buckets OK: bucketId=${bucketId} bucketType=${bucket.bucketType} revision=${bucket.revision}`)
+      console.log(`[b2-delete] b2_list_buckets OK: bucketId=${bucketId}`)
     } catch (e: any) {
       console.error(`[b2-delete] b2_list_buckets EXCEPTION: msg=${e?.message || e}`)
       return json({ success: false, error: `B2 list_buckets exception: ${e?.message || e}` }, 502)
@@ -186,7 +186,7 @@ export default async function handler(req: Request): Promise<Response> {
         ;(lvBody as any).startFileName = nextFile
         ;(lvBody as any).startFileId = nextVer || undefined
       }
-      console.warn(`[b2-delete] b2_list_file_versions OK: key=${key} found=${fileVersions.length} versions=${JSON.stringify(fileVersions.map((v) => ({ id: v.fileId, action: v.action })))}`)
+      console.log(`[b2-delete] b2_list_file_versions OK: key=${key} found=${fileVersions.length} versions`)
     } catch (e: any) {
       console.error(`[b2-delete] b2_list_file_versions EXCEPTION: msg=${e?.message || e}`)
       return json({ success: false, error: `B2 list_file_versions exception: ${e?.message || e}` }, 502)
@@ -194,8 +194,8 @@ export default async function handler(req: Request): Promise<Response> {
 
     // ---------- Step 4: 逐个版本 b2_delete_file_version（fileName + fileId 同时传入 = 物理删除）----------
     if (fileVersions.length === 0) {
-      console.warn(`[b2-delete] No file versions found for key=${key} → nothing to delete (already deleted or never existed)`)
-      return json({ success: true, key, deletedVersions: 0, note: 'No versions found (may not exist)' }, 200)
+      console.warn(`[b2-delete] No file versions found for key=${key}, nothing to delete`)
+      return json({ success: true, key, deletedVersions: 0 }, 200)
     }
 
     for (const v of fileVersions) {
@@ -211,13 +211,13 @@ export default async function handler(req: Request): Promise<Response> {
           return json({ success: false, error: `B2 delete_file_version failed: ${dfvResp.status}` }, 502)
         }
         const dfvJson: any = await dfvResp.json()
-        console.warn(`[b2-delete] b2_delete_file_version OK: key=${key} fileId=${v.fileId} action=${v.action} deletedFile=${dfvJson.fileName || 'ok'}`)
+        console.log(`[b2-delete] b2_delete_file_version OK: key=${key} fileId=${v.fileId}`)
       } catch (e: any) {
         console.error(`[b2-delete] b2_delete_file_version EXCEPTION: key=${key} fileId=${v.fileId} msg=${e?.message || e}`)
         return json({ success: false, error: `B2 delete_file_version exception: ${e?.message || e}` }, 502)
       }
     }
-    console.warn(`[b2-delete] All ${fileVersions.length} file versions deleted for key=${key}`)
+    console.log(`[b2-delete] All ${fileVersions.length} file versions deleted for key=${key}`)
 
     // ---------- Step 5: 再次 b2_list_file_versions 确认 0 版本残留 ----------
     try {
@@ -233,7 +233,7 @@ export default async function handler(req: Request): Promise<Response> {
           console.error(`[b2-delete] VERIFY FAILED: key=${key} STILL HAS ${remaining.length} VERSIONS:`, JSON.stringify(remaining.map((r) => ({ id: r.fileId, action: r.action }))))
           return json({ success: false, error: `${remaining.length} versions remain after b2_delete_file_version` }, 502)
         } else {
-          console.warn(`[b2-delete] VERIFY OK: key=${key} 0 versions remaining confirmed via b2_list_file_versions`)
+          console.log(`[b2-delete] VERIFY OK: key=${key} 0 versions remaining`)
         }
       }
     } catch {}
