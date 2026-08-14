@@ -53,3 +53,26 @@ export function getKeyFromProxyUrl(url: string): string {
   }
   return url
 }
+
+/**
+ * 校验图片 URL 数组中的 URL 是否都是合法的 http(s) 直链或 B2 代理地址
+ * 返回 { ok, invalidItems }
+ */
+export function validateImageUrls(urls: string[]): {
+  ok: boolean
+  invalidItems: number[]
+} {
+  const invalid: number[] = []
+  urls.forEach((u, i) => {
+    const trimmed = u.trim()
+    if (
+      !trimmed ||
+      /^https?:\/\/.+\.(jpg|jpeg|png|webp|avif|gif|bmp)(\?.*)?$/i.test(trimmed) ||
+      trimmed.startsWith('/api/b2-image-proxy')
+    ) {
+      return
+    }
+    invalid.push(i)
+  })
+  return { ok: invalid.length === 0, invalidItems: invalid }
+}

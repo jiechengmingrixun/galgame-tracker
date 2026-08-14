@@ -36,7 +36,7 @@ export interface GameRecord {
   synopsis?: string | null            // 作品简介
   private_notes?: string | null       // 私人笔记（仅自己可见，RLS 保护）
 
-  // ===== 图片（均为 Cloudflare R2 自定义域名的直链，或 VNDB 原图 URL）=====
+  // ===== 图片（B2 代理 URL 或 VNDB 原图 URL）=====
   screenshot_urls: string[]           // 个人截图 URL 数组（text[]）
   cg_urls: string[]                   // CG 图集 URL 数组（text[]）
   merch_urls: string[]                // 周边图片 URL 数组（text[]）

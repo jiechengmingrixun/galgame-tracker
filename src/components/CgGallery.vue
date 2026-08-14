@@ -2,7 +2,7 @@
   src/components/CgGallery.vue
   CG 图集 / 周边画廊组件
   - 使用 vue3-photo-preview 实现点击大图预览
-  - R2 的 https 图片直接渲染，无需代理
+  - B2 代理 URL 直接渲染，https 图片直链无需代理
   - 图片加载失败时展示占位图
   - 空数组展示自定义空提示
 -->
@@ -11,7 +11,7 @@ import { computed } from 'vue'
 
 const props = withDefaults(
   defineProps<{
-    /** 图片 URL 数组（R2 直链或任意 https 图片链接） */
+    /** 图片 URL 数组（B2 代理地址或任意 https 图片链接） */
     imageUrls: string[]
     /** 空态提示文字 */
     emptyHint?: string
