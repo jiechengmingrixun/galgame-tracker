@@ -14,7 +14,7 @@ const props = defineProps<{
   modelValue?: string
   /** 按钮文案，默认"选择图片" */
   label?: string
-  /** 允许的 MIME 类型，默认 jpeg/png/webp */
+  /** 允许的 MIME 类型，默认 image/* */
   accept?: string
   /** 单文件最大字节数，默认 5MB */
   maxSize?: number
@@ -26,8 +26,8 @@ const emit = defineEmits<{
 }>()
 
 const MAX_SIZE = computed(() => props.maxSize ?? 5 * 1024 * 1024)
-const ACCEPT = computed(() => props.accept ?? 'image/jpeg,image/png,image/webp')
 const MAX_SIZE_MB = computed(() => Math.round(MAX_SIZE.value / 1024 / 1024))
+const acceptAttr = computed(() => props.accept ?? 'image/*')
 
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const localPreview = ref<string | null>(null) // 本地 blob url
@@ -36,6 +36,7 @@ const deleting = ref(false)
 const errorMsg = ref('')
 const dragOver = ref(false)
 const currentKey = ref<string>('')
+const imgError = ref(false)
 
 watch(
   () => props.modelValue,
@@ -45,6 +46,7 @@ watch(
     } else {
       currentKey.value = ''
     }
+    imgError.value = false
   },
   { immediate: true },
 )
@@ -52,9 +54,8 @@ watch(
 const displayUrl = computed(() => localPreview.value ?? props.modelValue ?? '')
 
 function validateFile(file: File): string | null {
-  const allowed = ACCEPT.value.split(',').map((s) => s.trim())
-  if (!allowed.includes(file.type)) {
-    return `仅支持 ${allowed.join(' / ')} 格式`
+  if (!file.type.startsWith('image/')) {
+    return `仅支持图片格式文件`
   }
   if (file.size === 0) return '文件为空'
   if (file.size > MAX_SIZE.value) {
@@ -72,6 +73,7 @@ function clearLocalPreview() {
 
 async function onFileSelected(file: File) {
   errorMsg.value = ''
+  imgError.value = false
   const err = validateFile(file)
   if (err) {
     errorMsg.value = err
@@ -181,6 +183,10 @@ function onDrop(e: DragEvent) {
   const file = e.dataTransfer?.files?.[0]
   if (file) onFileSelected(file)
 }
+
+function handleImgError() {
+  imgError.value = true
+}
 </script>
 
 <template>
@@ -188,7 +194,7 @@ function onDrop(e: DragEvent) {
     <input
       ref="fileInputRef"
       type="file"
-      :accept="accept"
+      :accept="acceptAttr"
       style="display: none"
       @change="handleInputChange"
     />
@@ -196,10 +202,15 @@ function onDrop(e: DragEvent) {
     <div
       v-if="displayUrl"
       class="preview-box"
-      :class="{ uploading, deleting }"
+      :class="{ uploading, deleting, 'img-error': imgError }"
       @click="openPicker"
     >
-      <img :src="displayUrl" alt="preview" class="preview-img" />
+      <img v-if="!imgError" :src="displayUrl" alt="preview" class="preview-img" @error="handleImgError" />
+      <div v-else class="img-error-fallback">
+        <div class="img-error-icon">⚠️</div>
+        <div class="img-error-text">图片加载失败</div>
+        <div class="img-error-hint">点击重新选择</div>
+      </div>
       <div v-if="uploading" class="overlay">
         <span class="overlay-text">上传中…</span>
       </div>
@@ -229,7 +240,7 @@ function onDrop(e: DragEvent) {
     >
       <div class="picker-icon">🖼️</div>
       <div class="picker-label">{{ label || '选择图片' }}</div>
-      <div class="picker-hint">支持 JPEG / PNG / WebP，最大 {{ MAX_SIZE_MB }}MB</div>
+      <div class="picker-hint">支持所有图片格式，最大 {{ MAX_SIZE_MB }}MB</div>
     </div>
 
     <div v-if="errorMsg" class="error-msg">{{ errorMsg }}</div>
@@ -261,6 +272,24 @@ function onDrop(e: DragEvent) {
   background: rgba(255, 255, 255, 0.6);
   pointer-events: none;
 }
+.preview-box.img-error {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+.img-error-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 12px;
+  text-align: center;
+}
+.img-error-icon { font-size: 24px; }
+.img-error-text { font-size: 12px; color: #dc2626; font-weight: 500; }
+.img-error-hint { font-size: 11px; color: #991b1b; }
 .preview-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .overlay {
   position: absolute;
@@ -321,5 +350,15 @@ function onDrop(e: DragEvent) {
 .picker-icon { font-size: 30px; line-height: 1; margin-bottom: 6px; }
 .picker-label { font-size: 13px; font-weight: 500; color: #64748b; }
 .picker-hint { font-size: 11px; color: #94a3b8; margin-top: 4px; line-height: 1.3; }
-.error-msg { margin-top: 6px; font-size: 12px; color: #dc2626; max-width: 160px; }
+.error-msg {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #dc2626;
+  max-width: 200px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-weight: 500;
+}
 </style>

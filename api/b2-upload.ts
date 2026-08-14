@@ -10,7 +10,6 @@ export const config = {
   runtime: 'edge',
 }
 
-const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/webp'] as const
 const MAX_SIZE = 5 * 1024 * 1024
 
 function randHex(len: number): string {
@@ -24,12 +23,21 @@ function randHex(len: number): string {
 }
 
 function extFromMime(mime: string): string {
-  switch (mime) {
-    case 'image/jpeg': return 'jpg'
-    case 'image/png': return 'png'
-    case 'image/webp': return 'webp'
-    default: return 'bin'
+  const map: Record<string, string> = {
+    'image/jpeg': 'jpg',
+    'image/png': 'png',
+    'image/webp': 'webp',
+    'image/gif': 'gif',
+    'image/bmp': 'bmp',
+    'image/svg+xml': 'svg',
+    'image/tiff': 'tiff',
+    'image/x-icon': 'ico',
+    'image/vnd.microsoft.icon': 'ico',
+    'image/avif': 'avif',
+    'image/heic': 'heic',
+    'image/heif': 'heif',
   }
+  return map[mime] || 'img'
 }
 
 // ---------- JWT 校验 ----------
@@ -122,8 +130,8 @@ export default async function handler(req: Request): Promise<Response> {
   if (!file) return json({ success: false, error: 'Missing file field' }, 400)
 
   const mime = file.type
-  if (!ALLOWED_MIMES.includes(mime as typeof ALLOWED_MIMES[number])) {
-    return json({ success: false, error: 'Invalid file type. Only JPEG / PNG / WebP allowed' }, 400)
+  if (!mime.startsWith('image/')) {
+    return json({ success: false, error: 'Invalid file type. Only image files allowed' }, 400)
   }
   if (file.size === 0) return json({ success: false, error: 'Empty file' }, 400)
   if (file.size > MAX_SIZE) return json({ success: false, error: 'File too large (max 5MB)' }, 413)
