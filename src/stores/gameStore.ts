@@ -162,7 +162,7 @@ export const useGameStore = defineStore('game', {
           .order('updated_at', { ascending: false })
         if (error) throw error
         const freshRecords = (data ?? []) as GameRecord[]
-        // 防御：如果内存中已有某条记录的 cover_url/cg_urls/merch_urls
+        // 防御：如果内存中已有某条记录的 cover_url/cg_urls/merch_urls/developer_icon
         // 是用户刚刚提交的 B2 代理 URL（说明来自最近的 create/update），
         // 则用内存中的值覆盖服务器返回值，防止 Supabase 读延迟回滚。
         // 但保留服务器的 updated_at（cache-bust 需要用）。
@@ -172,6 +172,7 @@ export const useGameStore = defineStore('game', {
             const pickCached = (val: unknown): boolean =>
               typeof val === 'string' && val.startsWith('/api/b2-image-proxy')
             if (pickCached(cached.cover_url)) fresh.cover_url = cached.cover_url
+            if (pickCached(cached.developer_icon)) fresh.developer_icon = cached.developer_icon
             if (cached.cg_urls?.some(pickCached)) {
               fresh.cg_urls = cached.cg_urls
             }
@@ -259,6 +260,7 @@ export const useGameStore = defineStore('game', {
       rec = {
         ...rec,
         cover_url: payload.cover_url ?? rec.cover_url,
+        developer_icon: payload.developer_icon ?? rec.developer_icon,
         cg_urls: payload.cg_urls ?? rec.cg_urls,
         merch_urls: payload.merch_urls ?? rec.merch_urls,
       }
@@ -289,7 +291,7 @@ export const useGameStore = defineStore('game', {
 
       // DB 白名单：只保留 games 表中实际存在的列
       const DB_COLUMNS = new Set([
-        'title', 'original_title', 'vndb_id', 'cover_url', 'developer',
+        'title', 'original_title', 'vndb_id', 'cover_url', 'developer', 'developer_icon',
         'scenario_writers', 'artists', 'characters', 'release_date',
         'play_status', 'personal_rating', 'play_duration_hours',
         'start_date', 'finish_date', 'tags',
@@ -327,6 +329,7 @@ export const useGameStore = defineStore('game', {
       rec = {
         ...rec,
         cover_url: payload.cover_url !== undefined ? payload.cover_url : rec.cover_url,
+        developer_icon: payload.developer_icon !== undefined ? payload.developer_icon : rec.developer_icon,
         cg_urls: payload.cg_urls !== undefined ? payload.cg_urls : rec.cg_urls,
         merch_urls: payload.merch_urls !== undefined ? payload.merch_urls : rec.merch_urls,
       }
@@ -376,7 +379,7 @@ export const useGameStore = defineStore('game', {
         try {
           const { data } = await supabase
             .from(TABLE_NAME)
-            .select('cover_url, cg_urls, merch_urls')
+            .select('cover_url, developer_icon, cg_urls, merch_urls')
             .eq('id', id)
             .maybeSingle()
           if (data) rec = data as GameRecord
@@ -389,11 +392,13 @@ export const useGameStore = defineStore('game', {
       if (rec && token) {
         const urlsToClean: string[] = []
         if (rec.cover_url?.startsWith('/api/b2-image-proxy')) urlsToClean.push(rec.cover_url)
+        if (rec.developer_icon?.startsWith('/api/b2-image-proxy')) urlsToClean.push(rec.developer_icon)
         rec.cg_urls?.forEach((u) => { if (u.startsWith('/api/b2-image-proxy')) urlsToClean.push(u) })
         rec.merch_urls?.forEach((u) => { if (u.startsWith('/api/b2-image-proxy')) urlsToClean.push(u) })
 
         console.log('[gameStore][deleteRecord] start cleanup:', { id, totalImages: urlsToClean.length })
         if (rec.cover_url) console.log('[gameStore][deleteRecord] cover_url:', rec.cover_url)
+        if (rec.developer_icon) console.log('[gameStore][deleteRecord] developer_icon:', rec.developer_icon)
         if (rec.cg_urls?.length) console.log('[gameStore][deleteRecord] cg_urls:', rec.cg_urls)
         if (rec.merch_urls?.length) console.log('[gameStore][deleteRecord] merch_urls:', rec.merch_urls)
 
