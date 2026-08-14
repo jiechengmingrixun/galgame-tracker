@@ -249,7 +249,15 @@ async function doDelete() {
           <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-sm">
             <div>
               <dt class="text-slate-400 text-xs">制作组</dt>
-              <dd class="text-slate-700">{{ game.developer || '—' }}</dd>
+              <dd class="flex items-center gap-2 mt-0.5">
+                <img
+                  v-if="game.developer_icon"
+                  :src="proxiedImageUrl(game.developer_icon)"
+                  class="w-5 h-5 rounded object-contain bg-white/80 border border-slate-200"
+                  referrerpolicy="no-referrer"
+                />
+                <span class="text-slate-700">{{ game.developer || '—' }}</span>
+              </dd>
             </div>
             <div>
               <dt class="text-slate-400 text-xs">VNDB ID</dt>

@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS public.games (
   vndb_id               text,                   -- 例 v12345
   cover_url             text,                   -- VNDB 原图 URL（前端经 image-proxy 渲染）
   developer             text,                   -- 制作组
+  developer_icon         text,                   -- 制作公司图标 URL（VNDB 外链，经 image-proxy 渲染）
   scenario_writers      text[]      NOT NULL DEFAULT '{}',
   artists               text[]      NOT NULL DEFAULT '{}',
   characters            text[]      NOT NULL DEFAULT '{}',

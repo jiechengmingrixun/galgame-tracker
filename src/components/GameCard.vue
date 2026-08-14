@@ -88,7 +88,15 @@ const meta = computed(() => {
       </p>
 
       <div class="flex items-center justify-between text-xs text-slate-500">
-        <span class="truncate max-w-[65%]">{{ game.developer || '—' }}</span>
+        <div class="flex items-center gap-1 truncate max-w-[70%]">
+          <img
+            v-if="game.developer_icon"
+            :src="proxiedImageUrl(game.developer_icon)"
+            class="w-3.5 h-3.5 rounded object-contain bg-white/80 shrink-0"
+            referrerpolicy="no-referrer"
+          />
+          <span class="truncate">{{ game.developer || '—' }}</span>
+        </div>
         <span v-if="game.play_duration_hours" class="shrink-0">{{ game.play_duration_hours }}h</span>
       </div>
 

@@ -37,6 +37,7 @@ interface FormState {
   vndb_id: string
   cover_url: string
   developer: string
+  developer_icon: string
   scenario_writers: string[]
   artists: string[]
   characters: string[]
@@ -61,6 +62,7 @@ function defaultForm(): FormState {
     vndb_id: '',
     cover_url: '',
     developer: '',
+    developer_icon: '',
     scenario_writers: [],
     artists: [],
     characters: [],
@@ -95,6 +97,7 @@ watch(
       vndb_id: rec.vndb_id ?? '',
       cover_url: rec.cover_url ?? '',
       developer: rec.developer ?? '',
+      developer_icon: rec.developer_icon ?? '',
       scenario_writers: rec.scenario_writers ?? [],
       artists: rec.artists ?? [],
       characters: rec.characters ?? [],
@@ -151,6 +154,7 @@ function applyVn(vn: VndbSearchResult) {
   )
   if (vn.cover_url && !userHasCustomCover) form.cover_url = vn.cover_url
   if (vn.developer) form.developer = vn.developer
+  if (vn.developer_icon) form.developer_icon = vn.developer_icon
   if (vn.released) form.release_date = vn.released.slice(0, 10)
   if (vn.length_minutes) form.play_duration_hours = Math.round((vn.length_minutes / 60) * 10) / 10
   if (vn.scenario_writers?.length) form.scenario_writers = [...vn.scenario_writers]
@@ -348,6 +352,7 @@ function buildPayload(): GameRecordInput | null {
     vndb_id: form.vndb_id.trim() || null,
     cover_url: form.cover_url.trim() || null,
     developer: form.developer.trim() || null,
+    developer_icon: form.developer_icon.trim() || null,
     scenario_writers: scenarioWriters,
     artists: artists,
     characters: characters,
@@ -431,6 +436,15 @@ async function onSubmit(e: Event) {
           <div class="flex-1 min-w-0">
             <div class="font-medium text-slate-700 truncate">{{ vn.title }}</div>
             <div class="text-xs text-slate-400">{{ vn.id }} · {{ vn.released || '—' }}</div>
+            <div v-if="vn.developer" class="flex items-center gap-1.5 mt-1">
+              <img
+                v-if="vn.developer_icon"
+                :src="proxiedImageUrl(vn.developer_icon)"
+                class="w-4 h-4 rounded object-contain bg-white/80"
+                referrerpolicy="no-referrer"
+              />
+              <span class="text-xs text-slate-500">{{ vn.developer }}</span>
+            </div>
             <div v-if="vn.short_desc" class="text-xs text-slate-500 line-clamp-2 mt-1">
               {{ vn.short_desc }}
             </div>
@@ -467,7 +481,15 @@ async function onSubmit(e: Event) {
         </div>
         <div>
           <label class="block text-xs text-slate-500 mb-1">制作组 / 开发商</label>
-          <input v-model="form.developer" class="input-field" placeholder="例：Key" />
+          <div class="flex items-center gap-2">
+            <img
+              v-if="form.developer_icon"
+              :src="proxiedImageUrl(form.developer_icon)"
+              class="w-8 h-8 rounded-lg object-contain bg-white/80 border border-slate-200 shrink-0"
+              referrerpolicy="no-referrer"
+            />
+            <input v-model="form.developer" class="input-field flex-1" placeholder="例：Key" />
+          </div>
         </div>
         <div>
           <label class="block text-xs text-slate-500 mb-1">发售日期</label>

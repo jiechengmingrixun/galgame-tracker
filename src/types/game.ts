@@ -17,6 +17,7 @@ export interface GameRecord {
 
   cover_url?: string | null           // 封面图 URL（VNDB 提供的原图，前端需走 image-proxy 渲染）
   developer?: string | null           // 制作组/开发商
+  developer_icon?: string | null     // 制作公司图标 URL（VNDB 外链，经 image-proxy 渲染）
   scenario_writers?: string[] | null  // 剧本人员（数组，text[]）
   artists?: string[] | null           // 原画人员（数组，text[]）
   characters?: string[] | null        // 角色列表（数组，text[]）
@@ -55,7 +56,7 @@ export interface VndbVisualNovel {
     id?: string
     [k: string]: unknown
   } | null
-  developers?: Array<{ id: string; name: string; original?: string }>
+  developers?: Array<{ id: string; name: string; original?: string; image?: { url: string } | null }>
   released?: string                   // "2020-12-30T00:00:00Z" 或 "2020-12-30"
   length_minutes?: number | null      // 平均游玩时长（分钟）
   description?: string | null         // VNDB 英文描述

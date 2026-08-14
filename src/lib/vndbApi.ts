@@ -14,9 +14,10 @@ export interface VndbSearchResult {
   id: string
   title: string
   original_title: string
-  zh_title: string                  // VNDB 简体中文标题（可能为空）
+  zh_title: string
   cover_url: string
   developer: string
+  developer_icon: string
   released: string
   length_minutes: number | null
   short_desc: string
@@ -38,7 +39,7 @@ export async function searchVn(q: string): Promise<VndbSearchResult[]> {
   const body = {
     filters: ['search', '=', keyword],
     fields:
-      'id,title,titles.title,titles.lang,titles.main,image.url,developers.id,developers.name,developers.original,released,length_minutes,description,rating,staff.name,staff.role,staff.original',
+      'id,title,titles.title,titles.lang,titles.main,image.url,developers.id,developers.name,developers.original,developers.image.url,released,length_minutes,description,rating,staff.name,staff.role,staff.original',
     results: 15,
     sort: 'searchrank',
     reverse: false,
@@ -96,6 +97,7 @@ function mapToSearchResult(vn: VndbVisualNovel): VndbSearchResult {
     vn.titles?.find((t) => t.lang === 'zh')?.title ??
     ''
   const developer = vn.developers?.map((d) => d.original || d.name)[0] ?? ''
+  const developer_icon = vn.developers?.[0]?.image?.url ?? ''
   const short_desc = extractDescription(vn)
   const scenario_writers = extractStaffNames(vn.staff, ['scenario'])
   const artists = extractStaffNames(vn.staff, ['art', 'chardesign'])
@@ -107,6 +109,7 @@ function mapToSearchResult(vn: VndbVisualNovel): VndbSearchResult {
     zh_title: zhTitle,
     cover_url: vn.image?.url ?? '',
     developer,
+    developer_icon,
     released: vn.released ?? '',
     length_minutes: vn.length_minutes ?? null,
     short_desc,
@@ -128,6 +131,7 @@ export function vndbToForm(vn: VndbVisualNovel) {
   const jpTitle = vn.titles?.find((t) => t.lang === 'ja')?.title ?? vn.title
 
   const developers = vn.developers?.map((d) => d.original || d.name).filter(Boolean)
+  const developer_icon = vn.developers?.[0]?.image?.url ?? undefined
 
   let releaseDate: string | undefined
   if (vn.released) {
@@ -154,6 +158,7 @@ export function vndbToForm(vn: VndbVisualNovel) {
     vndb_id: vn.id,
     cover_url: vn.image?.url ?? undefined,
     developer: developers?.[0] ?? undefined,
+    developer_icon,
     scenario_writers: scenarioWriters,
     artists: artists,
     characters: [],
