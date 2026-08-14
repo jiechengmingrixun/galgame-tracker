@@ -305,6 +305,7 @@ export const useGameStore = defineStore('game', {
       }
 
       // 先更新，用 .select() 链式调用来检测受影响行数
+      console.error('[gameStore.updateRecord] update payload:', JSON.stringify(payloadWithoutNotes))
       const { data: updatedRows, error: updateError } = await supabase
         .from(TABLE_NAME)
         .update(payloadWithoutNotes as never)
