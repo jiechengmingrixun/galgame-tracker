@@ -109,7 +109,7 @@ async function onFileSelected(file: File) {
     const data = (await resp.json()) as {
       success: boolean
       url?: string
-      proxyUrl?: string
+      publicUrl?: string
       key?: string
       error?: string
     }
@@ -118,8 +118,9 @@ async function onFileSelected(file: File) {
       throw new Error(data.error || `上传失败 (${resp.status})`)
     }
 
-    // 优先使用 B2 公开直链，若加载失败回退到代理 URL
-    const finalUrl = data.url || data.proxyUrl || ''
+    // 默认用代理 URL（B2 私有桶，无需付费开公开访问）
+    // 如果未来付费开启公开桶+CDN，可改为 data.publicUrl
+    const finalUrl = data.url || ''
     clearLocalPreview()
     emit('update:modelValue', finalUrl)
   } catch (e) {

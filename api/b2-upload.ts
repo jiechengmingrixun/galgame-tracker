@@ -188,15 +188,15 @@ export default async function handler(req: Request): Promise<Response> {
     return json({ success: false, error: 'Upload failed: ' + (err as Error).message }, 502)
   }
 
-  // 生成 B2 公开直链（绕过 Vercel 代理，由 B2 CDN 直接分发）
-  const publicUrl = buildPublicUrl(key, B2_BUCKET_NAME, B2_ENDPOINT, B2_CDN_URL)
-  // 同时生成代理 URL 作为兜底（如果桶未开启公开访问）
+  // 默认返回代理 URL（B2 私有桶无需公开访问，省钱且安全）
+  // 如果配置了 B2_CDN_URL 且桶已开公开访问，可改用 publicUrl
   const proxyUrl = `/api/b2-image-proxy?fileKey=${encodeURIComponent(key)}`
+  const publicUrl = buildPublicUrl(key, B2_BUCKET_NAME, B2_ENDPOINT, B2_CDN_URL)
 
   return json({
     success: true,
-    url: publicUrl,
-    proxyUrl,
+    url: proxyUrl,
+    publicUrl,
     key,
   }, 200)
 }
