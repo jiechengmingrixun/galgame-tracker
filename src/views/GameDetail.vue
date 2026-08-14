@@ -9,9 +9,11 @@ import { useRoute, RouterLink } from 'vue-router'
 import CgGallery from '@/components/CgGallery.vue'
 import { getCurrentUser, supabase } from '@/lib/supabaseClient'
 import { proxiedImageUrl } from '@/lib/vndbApi'
+import { useGameStore } from '@/stores/gameStore'
 import type { GameRecord, PlayStatus } from '@/types/game'
 
 const route = useRoute()
+const store = useGameStore()
 
 // ========== 状态 ==========
 const game = ref<GameRecord | null>(null)
@@ -108,8 +110,9 @@ function joinOrDash(arr?: string[] | null) {
 async function doDelete() {
   if (!game.value) return
   try {
-    const { error } = await supabase.from('games').delete().eq('id', game.value.id)
-    if (error) throw error
+    // 走 store.deleteRecord：会先清理 B2 图片（cover/cg/merch），再删数据库记录
+    // 直接调 supabase.delete 会绕过 B2 清理，导致 B2 桶内残留孤儿图片
+    await store.deleteRecord(game.value.id)
     confirmDelete.value = false
     window.location.href = '/'
   } catch (e) {
