@@ -375,7 +375,7 @@ function buildPayload(): GameRecordInput | null {
 
 async function onSubmit(e: Event) {
   e.preventDefault()
-  console.warn('[GameForm][onSubmit] 提交前 form.cover_url:', form.cover_url)
+  console.warn('[GameForm][onSubmit] isEdit:', isEdit.value, 'game.id:', props.game?.id, 'form.cover_url:', form.cover_url)
   const payload = buildPayload()
   console.warn('[GameForm][onSubmit] payload.cover_url:', payload?.cover_url)
   if (!payload) return

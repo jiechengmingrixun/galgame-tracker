@@ -275,15 +275,23 @@ export const useGameStore = defineStore('game', {
       const privateNotes = payload.private_notes
       const { private_notes: _removed, ...payloadWithoutNotes } = payload
 
-      // 先更新
-      const { error: updateError } = await supabase
+      console.warn('[gameStore.updateRecord] id:', id, 'payload keys:', Object.keys(payloadWithoutNotes))
+
+      // 先更新，用 .select() 链式调用来检测受影响行数
+      const { data: updatedRows, error: updateError } = await supabase
         .from(TABLE_NAME)
         .update({ ...payloadWithoutNotes, updated_at: new Date().toISOString() } as never)
         .eq('id', id)
+        .select('id')
+
+      console.warn('[gameStore.updateRecord] update result:', JSON.stringify(updatedRows), 'error:', updateError?.message)
 
       if (updateError) throw updateError
+      if (!updatedRows || updatedRows.length === 0) {
+        throw new Error(`更新失败：未找到 id=${id} 的记录（可能是 RLS 权限或 ID 不匹配）`)
+      }
 
-      // 再查询回结果（避免 .single() 多行问题）
+      // 再查询回结果（读取完整数据）
       const { data, error: selectError } = await supabase
         .from(TABLE_NAME)
         .select('*')
