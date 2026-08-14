@@ -271,11 +271,17 @@ export const useGameStore = defineStore('game', {
 
     /** 更新（需管理员） */
     async updateRecord(id: string, payload: Partial<GameRecordInput>): Promise<GameRecord> {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const hasSession = !!sessionData.session
+      console.error('[gameStore.updateRecord] hasSession:', hasSession, 'id:', id)
+
+      if (!hasSession) {
+        throw new Error('登录状态已失效，请重新登录')
+      }
+
       // private_notes 已拆到独立表，不更新 games 表
       const privateNotes = payload.private_notes
       const { private_notes: _removed, ...payloadWithoutNotes } = payload
-
-      console.warn('[gameStore.updateRecord] id:', id, 'payload keys:', Object.keys(payloadWithoutNotes))
 
       // 先更新，用 .select() 链式调用来检测受影响行数
       const { data: updatedRows, error: updateError } = await supabase
@@ -284,10 +290,16 @@ export const useGameStore = defineStore('game', {
         .eq('id', id)
         .select('id')
 
-      console.warn('[gameStore.updateRecord] update result:', JSON.stringify(updatedRows), 'error:', updateError?.message)
+      console.error('[gameStore.updateRecord] update result rows:', updatedRows?.length ?? 0, 'error:', updateError?.message)
 
       if (updateError) throw updateError
       if (!updatedRows || updatedRows.length === 0) {
+        // 尝试不带 .select() 看看是不是 RLS 阻塞
+        const { count, error: countError } = await supabase
+          .from(TABLE_NAME)
+          .select('*', { count: 'exact', head: true })
+          .eq('id', id)
+        console.error('[gameStore.updateRecord] row count for id:', count, 'countError:', countError?.message)
         throw new Error(`更新失败：未找到 id=${id} 的记录（可能是 RLS 权限或 ID 不匹配）`)
       }
 

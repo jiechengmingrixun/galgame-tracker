@@ -291,7 +291,7 @@ function splitLines(raw: string): string[] {
 
 function buildPayload(): GameRecordInput | null {
   submitError.value = ''
-  console.warn('[GameForm][buildPayload] cover_url:', form.cover_url, 'cgUrls:', form.cgUrls, 'merchUrls:', form.merchUrls)
+  console.error('[GameForm][buildPayload] cover_url:', form.cover_url, 'cgUrls:', form.cgUrls, 'merchUrls:', form.merchUrls)
 
   // 校验必填
   if (!form.title.trim()) {
@@ -375,9 +375,9 @@ function buildPayload(): GameRecordInput | null {
 
 async function onSubmit(e: Event) {
   e.preventDefault()
-  console.warn('[GameForm][onSubmit] isEdit:', isEdit.value, 'game.id:', props.game?.id, 'form.cover_url:', form.cover_url)
+  console.error('[GameForm][onSubmit] isEdit:', isEdit.value, 'game.id:', props.game?.id, 'form.cover_url:', form.cover_url)
   const payload = buildPayload()
-  console.warn('[GameForm][onSubmit] payload.cover_url:', payload?.cover_url)
+  console.error('[GameForm][onSubmit] payload.cover_url:', payload?.cover_url)
   if (!payload) return
 
   submitting.value = true
