@@ -109,6 +109,7 @@ async function onFileSelected(file: File) {
     const data = (await resp.json()) as {
       success: boolean
       url?: string
+      proxyUrl?: string
       key?: string
       error?: string
     }
@@ -117,8 +118,10 @@ async function onFileSelected(file: File) {
       throw new Error(data.error || `上传失败 (${resp.status})`)
     }
 
+    // 优先使用 B2 公开直链，若加载失败回退到代理 URL
+    const finalUrl = data.url || data.proxyUrl || ''
     clearLocalPreview()
-    emit('update:modelValue', data.url)
+    emit('update:modelValue', finalUrl)
   } catch (e) {
     errorMsg.value = (e as Error).message || '上传失败'
     emit('error', errorMsg.value)

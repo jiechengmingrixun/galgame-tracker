@@ -166,6 +166,7 @@ async function doDelete() {
                 :src="cover"
                 :alt="game.title"
                 class="w-full h-full object-cover cursor-zoom-in"
+                decoding="async"
                 referrerpolicy="no-referrer"
               />
             </PhotoConsumer>
@@ -254,6 +255,8 @@ async function doDelete() {
                   v-if="game.developer_icon"
                   :src="proxiedImageUrl(game.developer_icon)"
                   class="w-5 h-5 rounded object-contain bg-white/80 border border-slate-200"
+                  loading="lazy"
+                  decoding="async"
                   referrerpolicy="no-referrer"
                 />
                 <span class="text-slate-700">{{ game.developer || '—' }}</span>

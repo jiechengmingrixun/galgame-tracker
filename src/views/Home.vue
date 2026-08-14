@@ -168,6 +168,8 @@ const activeFilters = computed(() => {
               v-if="dev.icon"
               :src="proxiedImageUrl(dev.icon)"
               class="w-full h-full object-contain bg-white"
+              loading="lazy"
+              decoding="async"
               referrerpolicy="no-referrer"
               :alt="dev.name"
             />

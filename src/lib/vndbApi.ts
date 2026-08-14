@@ -182,8 +182,10 @@ export function vndbToForm(vn: VndbVisualNovel) {
  */
 export function proxiedImageUrl(originalUrl: string | null | undefined): string | undefined {
   if (!originalUrl) return undefined
-  // B2 代理 URL 直接返回，不需要再套一层 image-proxy
+  // B2 代理 URL 直接返回（已带缓存头）
   if (originalUrl.startsWith('/api/b2-image-proxy')) return originalUrl
+  // B2 公开直链（b2s3/b2cdn 域名 + /file/ 路径）直接返回（B2 CDN 自带缓存）
+  if (/^https?:\/\/[^/]+\/file\//.test(originalUrl)) return originalUrl
   return `/api/image-proxy?url=${encodeURIComponent(originalUrl)}`
 }
 

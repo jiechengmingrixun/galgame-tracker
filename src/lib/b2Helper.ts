@@ -11,21 +11,45 @@ export function toB2ProxyUrl(key: string): string {
 }
 
 /**
+ * 从 B2 公开直链 URL 解析 fileKey
+ * 格式: https://endpoint/file/{bucket}/{key} 或 https://cdn.domain/file/{bucket}/{key}
+ */
+function extractKeyFromPublicUrl(url: string): string {
+  try {
+    const u = new URL(url)
+    // /file/{bucket}/uploads/xxx.jpg
+    const pathParts = u.pathname.split('/')
+    // pathParts[0] = '', [1] = 'file', [2] = bucket, [3] = key...
+    if (pathParts[1] === 'file' && pathParts.length > 3) {
+      return pathParts.slice(3).join('/')
+    }
+    // 旧格式兼容
+    return u.pathname.replace(/^\/+/, '')
+  } catch {
+    return ''
+  }
+}
+
+/**
  * 从 URL 中解析 fileKey
  * @param url 图片 URL
  */
 export function extractKeyFromUrl(url: string): string {
   if (!url) return ''
-  // 如果是代理 URL
+  // B2 代理 URL
   if (url.startsWith('/api/b2-image-proxy')) {
     try {
-      const u = new URL(`http://localhost${url}`) // 模拟完整 URL
+      const u = new URL(`http://localhost${url}`)
       return u.searchParams.get('fileKey') || ''
     } catch {
       return ''
     }
   }
-  // 如果是完整的 B2 URL
+  // B2 公开直链
+  if (/^https?:\/\/[^/]+\/file\//.test(url)) {
+    return extractKeyFromPublicUrl(url)
+  }
+  // 其他完整 URL
   try {
     const u = new URL(url)
     return u.pathname.replace(/^\/+/, '')
@@ -51,7 +75,21 @@ export function getKeyFromProxyUrl(url: string): string {
       return ''
     }
   }
+  // B2 公开直链
+  if (/^https?:\/\/[^/]+\/file\//.test(url)) {
+    return extractKeyFromPublicUrl(url)
+  }
   return url
+}
+
+/**
+ * 判断 URL 是否为 B2 存储的图片（需在删除时清理 B2 文件）
+ */
+export function isB2Url(url: string | null | undefined): boolean {
+  if (!url) return false
+  if (url.startsWith('/api/b2-image-proxy')) return true
+  if (/^https?:\/\/[^/]+\/file\//.test(url)) return true
+  return false
 }
 
 /**
@@ -67,8 +105,9 @@ export function validateImageUrls(urls: string[]): {
     const trimmed = u.trim()
     if (
       !trimmed ||
-      /^https?:\/\/.+\.(jpg|jpeg|png|webp|avif|gif|bmp)(\?.*)?$/i.test(trimmed) ||
-      trimmed.startsWith('/api/b2-image-proxy')
+      /^https?:\/\/.+\.(jpg|jpeg|png|webp|avif|gif|bmp|svg|tiff|ico)(\?.*)?$/i.test(trimmed) ||
+      trimmed.startsWith('/api/b2-image-proxy') ||
+      /^https?:\/\/[^/]+\/file\//.test(trimmed)
     ) {
       return
     }

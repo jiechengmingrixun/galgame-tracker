@@ -3,7 +3,7 @@
 
 import { defineStore } from 'pinia'
 import { supabase } from '@/lib/supabaseClient'
-import { getKeyFromProxyUrl } from '@/lib/b2Helper'
+import { getKeyFromProxyUrl, isB2Url } from '@/lib/b2Helper'
 import type {
   GameRecord,
   GameRecordInput,
@@ -170,7 +170,7 @@ export const useGameStore = defineStore('game', {
           const cached = this.records.find((r) => r.id === fresh.id)
           if (cached) {
             const pickCached = (val: unknown): boolean =>
-              typeof val === 'string' && val.startsWith('/api/b2-image-proxy')
+              typeof val === 'string' && isB2Url(val)
             if (pickCached(cached.cover_url)) fresh.cover_url = cached.cover_url
             if (pickCached(cached.developer_icon)) fresh.developer_icon = cached.developer_icon
             if (cached.cg_urls?.some(pickCached)) {
@@ -391,10 +391,10 @@ export const useGameStore = defineStore('game', {
 
       if (rec && token) {
         const urlsToClean: string[] = []
-        if (rec.cover_url?.startsWith('/api/b2-image-proxy')) urlsToClean.push(rec.cover_url)
-        if (rec.developer_icon?.startsWith('/api/b2-image-proxy')) urlsToClean.push(rec.developer_icon)
-        rec.cg_urls?.forEach((u) => { if (u.startsWith('/api/b2-image-proxy')) urlsToClean.push(u) })
-        rec.merch_urls?.forEach((u) => { if (u.startsWith('/api/b2-image-proxy')) urlsToClean.push(u) })
+        if (rec.cover_url && isB2Url(rec.cover_url)) urlsToClean.push(rec.cover_url)
+        if (rec.developer_icon && isB2Url(rec.developer_icon)) urlsToClean.push(rec.developer_icon)
+        rec.cg_urls?.forEach((u) => { if (isB2Url(u)) urlsToClean.push(u) })
+        rec.merch_urls?.forEach((u) => { if (isB2Url(u)) urlsToClean.push(u) })
 
         console.log('[gameStore][deleteRecord] start cleanup:', { id, totalImages: urlsToClean.length })
         if (rec.cover_url) console.log('[gameStore][deleteRecord] cover_url:', rec.cover_url)

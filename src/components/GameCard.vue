@@ -52,6 +52,7 @@ const meta = computed(() => {
         :src="coverSrc"
         :alt="game.title"
         loading="lazy"
+        decoding="async"
         referrerpolicy="no-referrer"
         class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         @error="($event.target as HTMLImageElement).style.opacity = '0'"
@@ -93,6 +94,8 @@ const meta = computed(() => {
             v-if="game.developer_icon"
             :src="proxiedImageUrl(game.developer_icon)"
             class="w-3.5 h-3.5 rounded object-contain bg-white/80 shrink-0"
+            loading="lazy"
+            decoding="async"
             referrerpolicy="no-referrer"
           />
           <span class="truncate">{{ game.developer || '—' }}</span>

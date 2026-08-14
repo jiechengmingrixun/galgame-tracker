@@ -1,7 +1,7 @@
 // api/image-proxy.ts
-// Vercel Edge Function: 代理 VNDB 图片请求，移除 Referer 头绕过防盗链
-// - 仅允许 VNDB 相关域名
-// - 不发送 Referer 头（VNDB CDN 防盗链检查点）
+// Vercel Edge Function: 代理 VNDB / Bangumi 图片请求，移除 Referer 头绕过防盗链
+// - 仅允许白名单域名
+// - 不发送 Referer 头
 // - 设置浏览器 + CDN 缓存头减少重复请求
 // - 限制最大图片大小 10MB
 
@@ -54,18 +54,22 @@ export default async function handler(req: Request): Promise<Response> {
     })
   }
 
+  // 允许浏览器缓存 VNDB/Bangumi 图片（这些是外部图片，不会频繁变化）
+  const cacheControl = reqUrl.searchParams.get('nocache')
+    ? 'no-store'
+    : 'public, max-age=2592000, s-maxage=2592000, immutable'
+
   try {
     const upstream = await fetch(target.toString(), {
       method: 'GET',
       headers: {
-        Accept:
-          'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
         'User-Agent':
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       },
       cf: {
         cacheEverything: true,
-        cacheTtl: 604800,
+        cacheTtl: 2592000, // 30 天 CDN 缓存
       },
     })
 
@@ -86,16 +90,22 @@ export default async function handler(req: Request): Promise<Response> {
       })
     }
 
-    return new Response(body, {
-      status: 200,
-      headers: {
-        'Content-Type': contentType,
-        'Content-Length': String(body.byteLength),
-        'Cache-Control': 'public, max-age=86400, s-maxage=604800',
-        'Access-Control-Allow-Origin': '*',
-        'Timing-Allow-Origin': '*',
-      },
-    })
+    const resHeaders = new Headers()
+    resHeaders.set('Content-Type', contentType)
+    resHeaders.set('Content-Length', String(body.byteLength))
+    resHeaders.set('Cache-Control', cacheControl)
+    resHeaders.set('Access-Control-Allow-Origin', '*')
+    resHeaders.set('Timing-Allow-Origin', '*')
+    resHeaders.set('X-Content-Type-Options', 'nosniff')
+    resHeaders.set('Referrer-Policy', 'no-referrer')
+
+    // 透传上游的 ETag / Last-Modified 让浏览器可以条件请求
+    const upstreamEtag = upstream.headers.get('etag')
+    if (upstreamEtag) resHeaders.set('ETag', upstreamEtag)
+    const upstreamLastMod = upstream.headers.get('last-modified')
+    if (upstreamLastMod) resHeaders.set('Last-Modified', upstreamLastMod)
+
+    return new Response(body, { status: 200, headers: resHeaders })
   } catch (err) {
     console.error('[image-proxy]', err)
     return new Response('Proxy failed: ' + (err as Error).message, {
