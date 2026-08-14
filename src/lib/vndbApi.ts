@@ -39,7 +39,7 @@ export async function searchVn(q: string): Promise<VndbSearchResult[]> {
   const body = {
     filters: ['search', '=', keyword],
     fields:
-      'id,title,titles.title,titles.lang,titles.main,image.url,developers.id,developers.name,developers.original,developers.image.url,released,length_minutes,description,rating,staff.name,staff.role,staff.original',
+      'id,title,titles.title,titles.lang,titles.main,image.url,developers.id,developers.name,developers.original,developers.image,released,length_minutes,description,rating,staff.name,staff.role,staff.original',
     results: 15,
     sort: 'searchrank',
     reverse: false,
@@ -97,7 +97,7 @@ function mapToSearchResult(vn: VndbVisualNovel): VndbSearchResult {
     vn.titles?.find((t) => t.lang === 'zh')?.title ??
     ''
   const developer = vn.developers?.map((d) => d.original || d.name)[0] ?? ''
-  const developer_icon = vn.developers?.[0]?.image?.url ?? ''
+  const developer_icon = vn.developers?.[0]?.image ?? ''
   const short_desc = extractDescription(vn)
   const scenario_writers = extractStaffNames(vn.staff, ['scenario'])
   const artists = extractStaffNames(vn.staff, ['art', 'chardesign'])
@@ -131,7 +131,7 @@ export function vndbToForm(vn: VndbVisualNovel) {
   const jpTitle = vn.titles?.find((t) => t.lang === 'ja')?.title ?? vn.title
 
   const developers = vn.developers?.map((d) => d.original || d.name).filter(Boolean)
-  const developer_icon = vn.developers?.[0]?.image?.url ?? undefined
+  const developer_icon = vn.developers?.[0]?.image ?? undefined
 
   let releaseDate: string | undefined
   if (vn.released) {

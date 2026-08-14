@@ -56,7 +56,7 @@ export interface VndbVisualNovel {
     id?: string
     [k: string]: unknown
   } | null
-  developers?: Array<{ id: string; name: string; original?: string; image?: { url: string } | null }>
+  developers?: Array<{ id: string; name: string; original?: string; image?: string | null }>
   released?: string                   // "2020-12-30T00:00:00Z" 或 "2020-12-30"
   length_minutes?: number | null      // 平均游玩时长（分钟）
   description?: string | null         // VNDB 英文描述
