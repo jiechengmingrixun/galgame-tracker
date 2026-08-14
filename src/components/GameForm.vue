@@ -9,7 +9,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { searchVn, fetchCharactersByVnId, proxiedImageUrl, type VndbSearchResult } from '@/lib/vndbApi'
+import { searchVn, fetchCharactersByVnId, fetchProducerIcon, proxiedImageUrl, type VndbSearchResult } from '@/lib/vndbApi'
 import { searchBangumi } from '@/lib/bangumiApi'
 import { mergeGameData, type DataSource } from '@/lib/sourceMerge'
 import { validateImageUrls } from '@/lib/b2Helper'
@@ -37,6 +37,7 @@ interface FormState {
   vndb_id: string
   cover_url: string
   developer: string
+  developer_id: string
   developer_icon: string
   scenario_writers: string[]
   artists: string[]
@@ -62,6 +63,7 @@ function defaultForm(): FormState {
     vndb_id: '',
     cover_url: '',
     developer: '',
+    developer_id: '',
     developer_icon: '',
     scenario_writers: [],
     artists: [],
@@ -97,6 +99,7 @@ watch(
       vndb_id: rec.vndb_id ?? '',
       cover_url: rec.cover_url ?? '',
       developer: rec.developer ?? '',
+      developer_id: '',
       developer_icon: rec.developer_icon ?? '',
       scenario_writers: rec.scenario_writers ?? [],
       artists: rec.artists ?? [],
@@ -154,7 +157,7 @@ function applyVn(vn: VndbSearchResult) {
   )
   if (vn.cover_url && !userHasCustomCover) form.cover_url = vn.cover_url
   if (vn.developer) form.developer = vn.developer
-  if (vn.developer_icon) form.developer_icon = vn.developer_icon
+  if (vn.developer_id) form.developer_id = vn.developer_id
   if (vn.released) form.release_date = vn.released.slice(0, 10)
   if (vn.length_minutes) form.play_duration_hours = Math.round((vn.length_minutes / 60) * 10) / 10
   if (vn.scenario_writers?.length) form.scenario_writers = [...vn.scenario_writers]
@@ -179,23 +182,25 @@ function applyVn(vn: VndbSearchResult) {
 async function enrichGameData(vn: VndbSearchResult) {
   enriching.value = true
 
-  // 并行请求 Bangumi 和 VNDB 角色
   const searchKey = vn.original_title || vn.title
-  const [bangumiResult, characters] = await Promise.all([
+  const [bangumiResult, characters, producerIcon] = await Promise.all([
     searchBangumi(searchKey),
     fetchCharactersByVnId(vn.id),
+    vn.developer_id ? fetchProducerIcon(vn.developer_id) : Promise.resolve(undefined),
   ])
 
-  // 合并 Bangumi 数据（覆盖标题和简介）
   const merged = mergeGameData(vn, bangumiResult)
   form.title = merged.title
   form.synopsis = merged.synopsis
   titleSource.value = merged.titleSource
   synopsisSource.value = merged.synopsisSource
 
-  // 回填角色
   if (characters.length > 0) {
     form.characters = characters
+  }
+
+  if (producerIcon) {
+    form.developer_icon = producerIcon
   }
 
   enriching.value = false

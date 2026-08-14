@@ -17,6 +17,7 @@ export interface VndbSearchResult {
   zh_title: string
   cover_url: string
   developer: string
+  developer_id: string
   developer_icon: string
   released: string
   length_minutes: number | null
@@ -39,7 +40,7 @@ export async function searchVn(q: string): Promise<VndbSearchResult[]> {
   const body = {
     filters: ['search', '=', keyword],
     fields:
-      'id,title,titles.title,titles.lang,titles.main,image.url,developers.id,developers.name,developers.original,developers.image,released,length_minutes,description,rating,staff.name,staff.role,staff.original',
+      'id,title,titles.title,titles.lang,titles.main,image.url,developers.id,developers.name,developers.original,released,length_minutes,description,rating,staff.name,staff.role,staff.original',
     results: 15,
     sort: 'searchrank',
     reverse: false,
@@ -97,7 +98,7 @@ function mapToSearchResult(vn: VndbVisualNovel): VndbSearchResult {
     vn.titles?.find((t) => t.lang === 'zh')?.title ??
     ''
   const developer = vn.developers?.map((d) => d.original || d.name)[0] ?? ''
-  const developer_icon = vn.developers?.[0]?.image ?? ''
+  const developer_id = vn.developers?.[0]?.id ?? ''
   const short_desc = extractDescription(vn)
   const scenario_writers = extractStaffNames(vn.staff, ['scenario'])
   const artists = extractStaffNames(vn.staff, ['art', 'chardesign'])
@@ -109,7 +110,8 @@ function mapToSearchResult(vn: VndbVisualNovel): VndbSearchResult {
     zh_title: zhTitle,
     cover_url: vn.image?.url ?? '',
     developer,
-    developer_icon,
+    developer_id,
+    developer_icon: '',
     released: vn.released ?? '',
     length_minutes: vn.length_minutes ?? null,
     short_desc,
@@ -131,7 +133,8 @@ export function vndbToForm(vn: VndbVisualNovel) {
   const jpTitle = vn.titles?.find((t) => t.lang === 'ja')?.title ?? vn.title
 
   const developers = vn.developers?.map((d) => d.original || d.name).filter(Boolean)
-  const developer_icon = vn.developers?.[0]?.image ?? undefined
+  const developer_id = vn.developers?.[0]?.id ?? undefined
+  const developer_icon = undefined
 
   let releaseDate: string | undefined
   if (vn.released) {
@@ -158,6 +161,7 @@ export function vndbToForm(vn: VndbVisualNovel) {
     vndb_id: vn.id,
     cover_url: vn.image?.url ?? undefined,
     developer: developers?.[0] ?? undefined,
+    developer_id,
     developer_icon,
     scenario_writers: scenarioWriters,
     artists: artists,
@@ -180,6 +184,37 @@ export function proxiedImageUrl(originalUrl: string | null | undefined): string 
   // B2 代理 URL 直接返回，不需要再套一层 image-proxy
   if (originalUrl.startsWith('/api/b2-image-proxy')) return originalUrl
   return `/api/image-proxy?url=${encodeURIComponent(originalUrl)}`
+}
+
+/**
+ * 通过制作公司 ID 查询公司图标
+ * 使用 /producer 端点 + id 过滤器
+ * 失败时返回 undefined，不抛异常
+ */
+export async function fetchProducerIcon(producerId: string): Promise<string | undefined> {
+  if (!producerId) return undefined
+
+  try {
+    const resp = await fetch(`${API_BASE}/producer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({
+        filters: ['id', '=', producerId],
+        fields: 'image',
+        results: 1,
+      }),
+      signal: AbortSignal.timeout(10000),
+    })
+
+    if (!resp.ok) {
+      return undefined
+    }
+
+    const json = (await resp.json()) as { results?: Array<{ image?: string | null }> }
+    return json.results?.[0]?.image ?? undefined
+  } catch {
+    return undefined
+  }
 }
 
 /**
