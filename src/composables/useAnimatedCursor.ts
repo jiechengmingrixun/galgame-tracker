@@ -6,6 +6,12 @@
  * 设计：CSS cursor: url(...) 无法播放 PNG 序列动画（仅静态）
  * 因此采用 DOM 跟随 + requestAnimationFrame 帧切换实现动态效果。
  * 全局同时设置 static cursor 作为 fallback（JS 失效时可见）。
+ *
+ * 性能关键点：
+ * - 使用 Pointer Events（pointermove）替代 mousemove，并启用 capture 阶段，
+ *   确保在 input[type=range] 等原生控件内部 setPointerCapture 期间仍能连续拿到坐标
+ * - 暴露 subscribeMove(cb)：组件层可以直接把 (x-hotspotX, y-hotspotY) 写入
+ *   DOM 的 transform，绕开 Vue 响应式对象 → computed → :style 的链路，降低延迟
  */
 import { ref, reactive, onMounted, onBeforeUnmount, shallowRef } from 'vue'
 
@@ -33,6 +39,8 @@ interface CursorMeta {
   frameDurationMs: number
   urls: string[] // preloaded absolute urls to frame PNG (64x64 for crisp)
 }
+
+type MoveSubscriber = (x: number, y: number, hx: number, hy: number) => void
 
 const BASE = '/cursors'
 const SIZE = 64 // show 64x64 for visual; hotspot scales proportionally
@@ -100,6 +108,13 @@ export function useAnimatedCursor() {
   let accumTime = 0
   let mouseInViewport = false
 
+  // 直接 DOM 订阅（低延迟路径）：组件可通过 subscribeMove 拿到坐标直接写 transform
+  const subscribers = new Set<MoveSubscriber>()
+
+  // 缓存当前 hotspot 数值（避免每次 subscriber 回调里读 reactive getter）
+  let curHotX = 0
+  let curHotY = 0
+
   function buildMeta(manifest: any) {
     const result: Partial<Record<CursorState, CursorMeta>> = {}
     for (const slug of Object.keys(STATE_BY_KEYWORD)
@@ -130,13 +145,12 @@ export function useAnimatedCursor() {
     }
     hotspot.x = meta.xhot
     hotspot.y = meta.yhot
+    curHotX = meta.xhot
+    curHotY = meta.yhot
   }
 
   /**
    * 检测元素是否为浏览器原生 UI 控件（其弹出面板不在 DOM 中，CSS cursor 无法控制）。
-   * - <select>：下拉选项面板
-   * - <input type="date|datetime-local|month|week|time">：日历/时间选择面板
-   * - <input type="color">：取色器面板
    */
   function isNativeUiControl(el: Element | null): boolean {
     if (!el) return false
@@ -152,17 +166,12 @@ export function useAnimatedCursor() {
   }
 
   function resolveStateFromElement(el: Element | null): CursorState {
-    // Walk from target up to document, detect cursor state by element characteristics.
-    // 注意：不使用 getComputedStyle，因为在 animated-cursor-on 模式下
-    // 所有元素的 cursor 都被覆盖为 none，computed cursor 不可靠。
     let node: Element | null = el
     while (node) {
       if (node instanceof HTMLElement || node instanceof SVGElement) {
         const tag = (node.tagName || '').toLowerCase()
-        // 原生 UI 控件：光标状态交给系统（挂起动态层）
         if (isNativeUiControl(node)) return 'normal'
 
-        // 按 tag / type / 属性 / class 判断
         if (tag === 'a' && (node as HTMLElement).getAttribute('href') !== null) return 'link'
         if (tag === 'button') return 'link'
         if ((node as HTMLElement).getAttribute('role') === 'button') return 'link'
@@ -170,13 +179,13 @@ export function useAnimatedCursor() {
         if (tag === 'input') {
           const type = ((node as HTMLInputElement).type || 'text').toLowerCase()
           if (['button', 'submit', 'reset', 'image', 'checkbox', 'radio', 'file'].includes(type)) return 'link'
-          // text/email/password/search/url/number 等 → text 状态
+          // 滑动条 / 数值框 → 保持 normal 状态（避免 hotpost 切换导致光标视觉跳变）
+          if (['range', 'number'].includes(type)) return 'normal'
           return 'text'
         }
         if (tag === 'textarea') return 'text'
         if (tag === 'label') return 'link'
         if ((node as HTMLElement).draggable === true) return 'move'
-        // Tailwind / 自定义 class 检测
         const cl = (node as HTMLElement).classList
         if (cl?.contains('cursor-pointer')) return 'link'
         if (cl?.contains('cursor-text')) return 'text'
@@ -208,20 +217,36 @@ export function useAnimatedCursor() {
     applyState(state)
   }
 
-  function onMouseMove(e: MouseEvent) {
+  function dispatchSubscribers(x: number, y: number) {
+    if (subscribers.size === 0) return
+    for (const cb of subscribers) cb(x, y, curHotX, curHotY)
+  }
+
+  function onPointerMove(e: PointerEvent) {
+    // 只处理真正的鼠标（忽略触控/笔，避免冲突）
+    if (e.pointerType && e.pointerType !== 'mouse') return
     mouseInViewport = true
-    pos.x = e.clientX
-    pos.y = e.clientY
+    const x = e.clientX
+    const y = e.clientY
+    // 1) 响应式路径（给 template 的 :style 用）
+    pos.x = x
+    pos.y = y
+    // 2) 低延迟路径：直接通知订阅者写 DOM
+    dispatchSubscribers(x, y)
+    // 3) 更新 cursor 状态
     updateFromComputed(e.target as Element | null)
   }
 
-  function onMouseLeave() {
+  function onPointerLeave(e: PointerEvent) {
+    if (e.pointerType && e.pointerType !== 'mouse') return
     mouseInViewport = false
     pos.x = -9999
     pos.y = -9999
+    dispatchSubscribers(-9999, -9999)
   }
 
-  function onMouseEnter() {
+  function onPointerEnter(e: PointerEvent) {
+    if (e.pointerType && e.pointerType !== 'mouse') return
     mouseInViewport = true
   }
 
@@ -250,14 +275,12 @@ export function useAnimatedCursor() {
     try {
       const manifest = await loadManifest()
       metas = buildMeta(manifest)
-      // Preload all frames for seamless animation
       const allUrls: string[] = []
       for (const slug of Object.keys(metas) as CursorState[]) {
         const m = metas[slug]!
         allUrls.push(...m.urls)
       }
       await preload(allUrls)
-      // set initial
       applyState('normal')
       const m = metas.normal
       if (m && m.urls[0]) currentSrc.value = m.urls[0]
@@ -271,18 +294,29 @@ export function useAnimatedCursor() {
     }
   }
 
+  /** 订阅低延迟的鼠标移动（直接拿数值，供组件写 DOM transform） */
+  function subscribeMove(cb: MoveSubscriber): () => void {
+    subscribers.add(cb)
+    // 立刻推送一次当前位置，避免组件挂载时滞后
+    cb(pos.x, pos.y, curHotX, curHotY)
+    return () => subscribers.delete(cb)
+  }
+
   onMounted(() => {
-    window.addEventListener('mousemove', onMouseMove, { passive: true })
-    document.addEventListener('mouseleave', onMouseLeave)
-    document.addEventListener('mouseenter', onMouseEnter)
+    // capture: true —— 先于任何子元素的 pointer capture 拿到事件，
+    // 确保在 input[type=range] 拖动（内部会 setPointerCapture）期间仍能拿到连续坐标
+    window.addEventListener('pointermove', onPointerMove, { passive: true, capture: true })
+    document.addEventListener('pointerleave', onPointerLeave, { capture: true })
+    document.addEventListener('pointerenter', onPointerEnter, { capture: true })
     rafId = requestAnimationFrame(tick)
     init()
   })
 
   onBeforeUnmount(() => {
-    window.removeEventListener('mousemove', onMouseMove)
-    document.removeEventListener('mouseleave', onMouseLeave)
-    document.removeEventListener('mouseenter', onMouseEnter)
+    window.removeEventListener('pointermove', onPointerMove, { capture: true })
+    document.removeEventListener('pointerleave', onPointerLeave, { capture: true })
+    document.removeEventListener('pointerenter', onPointerEnter, { capture: true })
+    subscribers.clear()
     if (rafId) cancelAnimationFrame(rafId)
   })
 
@@ -295,5 +329,6 @@ export function useAnimatedCursor() {
     enabled,
     loading,
     size: SIZE,
+    subscribeMove,
   }
 }
