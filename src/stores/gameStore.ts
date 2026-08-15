@@ -346,10 +346,15 @@ export const useGameStore = defineStore('game', {
     /** 保存私人笔记（upsert 到 game_private_notes 表） */
     async savePrivateNotes(gameId: string, notes: string | null): Promise<void> {
       const trimmed = notes?.trim() || null
+      // 获取当前用户 ID（RLS 要求 owner_id = auth.uid()）
+      const { data: sessionData } = await supabase.auth.getSession()
+      const userId = sessionData.session?.user.id
+      if (!userId) throw new Error('未登录，无法保存私人笔记')
+
       if (trimmed) {
         const { error } = await supabase
           .from('game_private_notes')
-          .upsert({ game_id: gameId, notes: trimmed }, { onConflict: 'game_id' })
+          .upsert({ game_id: gameId, owner_id: userId, notes: trimmed }, { onConflict: 'game_id' })
         if (error) throw error
       } else {
         // 空笔记则删除记录
@@ -357,6 +362,7 @@ export const useGameStore = defineStore('game', {
           .from('game_private_notes')
           .delete()
           .eq('game_id', gameId)
+          .eq('owner_id', userId)
         if (error) throw error
       }
     },

@@ -153,7 +153,8 @@ function fadeTo(targetVolume: number, duration = FADE_DURATION): Promise<void> {
       if (!audio.value) return resolve()
       const elapsed = now - startTime
       const progress = Math.min(elapsed / duration, 1)
-      audio.value.volume = startVol + (targetVolume - startVol) * progress
+      const v = Math.max(0, Math.min(1, startVol + (targetVolume - startVol) * progress))
+      audio.value.volume = v
       if (progress < 1) {
         fadeRafId = requestAnimationFrame(step)
       } else {
