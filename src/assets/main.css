@@ -85,14 +85,15 @@ textarea,
 }
 
 /* --- 动画层启用时：用透明 PNG 隐藏系统光标，用 DOM 元素替代 ---
-   注意：使用透明 PNG 而非 cursor:none，因为 Chrome 对表单元素
-   (input/select) 的 cursor:none 支持不完整，focus/输入时可能仍显示系统光标。
-   透明 PNG cursor 兼容性更好，能可靠地隐藏所有元素上的系统光标。 --- */
+   使用 32x32 透明 PNG（data URI 内联，避免文件加载延迟/失败）。
+   不用 cursor:none，因为 Chrome 对表单元素（尤其 backdrop-filter 容器内的
+   input）的 cursor:none 支持不完整，focus/输入时可能仍显示系统光标。
+   32x32 比 1x1 更可靠 — 部分 Chrome 版本会忽略过小的 cursor 图片。 --- */
 html.animated-cursor-on,
 html.animated-cursor-on *,
 html.animated-cursor-on *::before,
 html.animated-cursor-on *::after {
-  cursor: url(/cursors/transparent.png) 0 0, none !important;
+  cursor: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAGklEQVR4nO3BAQEAAACCIP+vbkhAAQAAAO8GECAAARlDNO4AAAAASUVORK5CYII=) 0 0, none !important;
 }
 
 @layer base {
