@@ -7,6 +7,7 @@ import { RouterView } from 'vue-router'
 import AnimeBg from '@/components/AnimeBg.vue'
 import Live2dWaifu from '@/components/Live2dWaifu.vue'
 import AnimatedCursor from '@/components/AnimatedCursor.vue'
+import BgmPlayer from '@/components/BgmPlayer.vue'
 
 const router = useRouter()
 const isLoggedIn = ref(false)
@@ -103,6 +104,9 @@ onMounted(async () => {
 
     <!-- 朱雀院椿 动态鼠标指针 -->
     <AnimatedCursor />
+
+    <!-- 背景音乐播放器 -->
+    <BgmPlayer />
   </div>
 </template>
 
