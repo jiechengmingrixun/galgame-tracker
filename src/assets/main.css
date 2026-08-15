@@ -3,6 +3,98 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ========================================================
+ * 朱雀院椿 自定义鼠标指针
+ * 双层方案：
+ *   1) Fallback 静态层：cursor: url(xxx.png) x y, auto; 保证兼容性
+ *   2) 动画层（JS）：DOM 跟随 + requestAnimationFrame 帧切换
+ *      启用时 html.animated-cursor-on 会隐藏系统光标
+ * ====================================================== */
+
+/* --- Fallback: 静态 PNG cursor (32x32)，热点坐标来自 manifest --- */
+html,
+body {
+  cursor: url(/cursors/normal_32.png) 0 0, auto;
+}
+a,
+button,
+input[type="button"],
+input[type="submit"],
+input[type="reset"],
+input[type="image"],
+input[type="checkbox"],
+input[type="radio"],
+input[type="file"],
+select,
+label,
+[role="button"],
+[onclick],
+.cursor-pointer {
+  cursor: url(/cursors/link_32.png) 0 0, pointer;
+}
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="search"],
+input[type="tel"],
+input[type="url"],
+input[type="number"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="month"],
+input[type="week"],
+input[type="time"],
+textarea,
+[contenteditable="true"],
+.cursor-text {
+  cursor: url(/cursors/text_32.png) 6 12, text;
+}
+.cursor-wait,
+.cursor-progress,
+[aria-busy="true"] {
+  cursor: url(/cursors/wait_32.png) 0 0, wait;
+}
+.cursor-help {
+  cursor: url(/cursors/help_32.png) 0 0, help;
+}
+.cursor-not-allowed,
+[disabled],
+[aria-disabled="true"] {
+  cursor: url(/cursors/unavailable_32.png) 9 9, not-allowed;
+}
+.cursor-move,
+[draggable="true"] {
+  cursor: url(/cursors/move_32.png) 11 11, move;
+}
+.cursor-crosshair {
+  cursor: url(/cursors/precision_32.png) 12 12, crosshair;
+}
+.cursor-ns-resize,
+.row-resize {
+  cursor: url(/cursors/vresize_32.png) 10 14, ns-resize;
+}
+.cursor-ew-resize,
+.col-resize {
+  cursor: url(/cursors/hresize_32.png) 14 9, ew-resize;
+}
+.cursor-nwse-resize {
+  cursor: url(/cursors/diag1_32.png) 11 10, nwse-resize;
+}
+.cursor-nesw-resize {
+  cursor: url(/cursors/diag2_32.png) 11 10, nesw-resize;
+}
+
+/* --- 动画层启用时：用透明 PNG 隐藏系统光标，用 DOM 元素替代 ---
+   注意：使用透明 PNG 而非 cursor:none，因为 Chrome 对表单元素
+   (input/select) 的 cursor:none 支持不完整，focus/输入时可能仍显示系统光标。
+   透明 PNG cursor 兼容性更好，能可靠地隐藏所有元素上的系统光标。 --- */
+html.animated-cursor-on,
+html.animated-cursor-on *,
+html.animated-cursor-on *::before,
+html.animated-cursor-on *::after {
+  cursor: url(/cursors/transparent.png) 0 0, none !important;
+}
+
 @layer base {
   html {
     scroll-behavior: smooth;

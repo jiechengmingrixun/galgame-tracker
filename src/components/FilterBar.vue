@@ -5,6 +5,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { PlayStatus, SortKey } from '@/types/game'
+import CustomSelect from '@/components/CustomSelect.vue'
 
 const props = defineProps<{
   search: string
@@ -39,6 +40,11 @@ const sortList: { key: SortKey; label: string }[] = [
   { key: 'finish_date_asc', label: '通关日期旧→新' },
 ]
 
+// CustomSelect 需要的 options 格式
+const sortOptions = computed(() =>
+  sortList.map((s) => ({ value: s.key, label: s.label }))
+)
+
 function toggleTag(t: string) {
   const next = props.selectedTags.includes(t)
     ? props.selectedTags.filter((x) => x !== t)
@@ -69,13 +75,12 @@ const ratingOptions = computed(() => [
           class="input-field !pl-9"
         />
       </div>
-      <select
-        :value="sortKey"
-        @change="emit('update:sortKey', ($event.target as HTMLSelectElement).value as SortKey)"
-        class="input-field sm:w-48"
-      >
-        <option v-for="s in sortList" :key="s.key" :value="s.key">{{ s.label }}</option>
-      </select>
+      <CustomSelect
+        :modelValue="sortKey"
+        @update:modelValue="emit('update:sortKey', $event as SortKey)"
+        :options="sortOptions"
+        class="sm:w-48"
+      />
       <button class="btn-ghost shrink-0" @click="emit('reset')">
         ✕ 重置
       </button>

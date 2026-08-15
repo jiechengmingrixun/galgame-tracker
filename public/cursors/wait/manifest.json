@@ -1,0 +1,43 @@
+{
+  "name": "wait",
+  "frames": 8,
+  "rate_jiffies": 10,
+  "orig_w": 128,
+  "orig_h": 128,
+  "xhot_orig": 0,
+  "yhot_orig": 0,
+  "sizes": {
+    "32": {
+      "xhot": 0,
+      "yhot": 0,
+      "frame_duration_ms": 166,
+      "frames": [
+        "frame_000.png",
+        "frame_001.png",
+        "frame_002.png",
+        "frame_003.png",
+        "frame_004.png",
+        "frame_005.png",
+        "frame_006.png",
+        "frame_007.png"
+      ],
+      "static": "wait_32.png"
+    },
+    "64": {
+      "xhot": 0,
+      "yhot": 0,
+      "frame_duration_ms": 166,
+      "frames": [
+        "frame_000.png",
+        "frame_001.png",
+        "frame_002.png",
+        "frame_003.png",
+        "frame_004.png",
+        "frame_005.png",
+        "frame_006.png",
+        "frame_007.png"
+      ],
+      "static": "wait_64.png"
+    }
+  }
+}

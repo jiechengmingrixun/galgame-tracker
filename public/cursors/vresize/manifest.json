@@ -1,0 +1,67 @@
+{
+  "name": "vresize",
+  "frames": 20,
+  "rate_jiffies": 6,
+  "orig_w": 128,
+  "orig_h": 128,
+  "xhot_orig": 38,
+  "yhot_orig": 54,
+  "sizes": {
+    "32": {
+      "xhot": 10,
+      "yhot": 14,
+      "frame_duration_ms": 100,
+      "frames": [
+        "frame_000.png",
+        "frame_001.png",
+        "frame_002.png",
+        "frame_003.png",
+        "frame_004.png",
+        "frame_005.png",
+        "frame_006.png",
+        "frame_007.png",
+        "frame_008.png",
+        "frame_009.png",
+        "frame_010.png",
+        "frame_011.png",
+        "frame_012.png",
+        "frame_013.png",
+        "frame_014.png",
+        "frame_015.png",
+        "frame_016.png",
+        "frame_017.png",
+        "frame_018.png",
+        "frame_019.png"
+      ],
+      "static": "vresize_32.png"
+    },
+    "64": {
+      "xhot": 19,
+      "yhot": 27,
+      "frame_duration_ms": 100,
+      "frames": [
+        "frame_000.png",
+        "frame_001.png",
+        "frame_002.png",
+        "frame_003.png",
+        "frame_004.png",
+        "frame_005.png",
+        "frame_006.png",
+        "frame_007.png",
+        "frame_008.png",
+        "frame_009.png",
+        "frame_010.png",
+        "frame_011.png",
+        "frame_012.png",
+        "frame_013.png",
+        "frame_014.png",
+        "frame_015.png",
+        "frame_016.png",
+        "frame_017.png",
+        "frame_018.png",
+        "frame_019.png"
+      ],
+      "static": "vresize_64.png"
+    }
+  }
+}

@@ -15,6 +15,8 @@ import { mergeGameData, type DataSource } from '@/lib/sourceMerge'
 import { validateImageUrls } from '@/lib/b2Helper'
 import { useGameStore } from '@/stores/gameStore'
 import ImageUploader from '@/components/ImageUploader.vue'
+import CustomSelect from '@/components/CustomSelect.vue'
+import CustomDatePicker from '@/components/CustomDatePicker.vue'
 import { supabase } from '@/lib/supabaseClient'
 import type { GameRecord, GameRecordInput, PlayStatus } from '@/types/game'
 
@@ -297,6 +299,11 @@ const statusOptions: { key: PlayStatus; label: string }[] = [
   { key: 'completed', label: '🎉 已通关' },
 ]
 
+// CustomSelect 需要的 options 格式
+const statusSelectOptions = computed(() =>
+  statusOptions.map((s) => ({ value: s.key, label: s.label }))
+)
+
 // 选中「已通关」时自动将 CG 收集进度设为 100%
 watch(
   () => form.play_status,
@@ -518,7 +525,7 @@ async function onSubmit(e: Event) {
         </div>
         <div>
           <label class="block text-xs text-slate-500 mb-1">发售日期</label>
-          <input v-model="form.release_date" type="date" class="input-field" />
+          <CustomDatePicker v-model="form.release_date" />
         </div>
         <div>
           <label class="block text-xs text-slate-500 mb-1">封面图</label>
@@ -587,9 +594,7 @@ async function onSubmit(e: Event) {
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label class="block text-xs text-slate-500 mb-1">游玩状态 *</label>
-          <select v-model="form.play_status" class="input-field">
-            <option v-for="s in statusOptions" :key="s.key" :value="s.key">{{ s.label }}</option>
-          </select>
+          <CustomSelect v-model="form.play_status" :options="statusSelectOptions" />
         </div>
         <div>
           <label class="block text-xs text-slate-500 mb-1">个人评分（0~10）</label>
@@ -616,11 +621,11 @@ async function onSubmit(e: Event) {
         </div>
         <div>
           <label class="block text-xs text-slate-500 mb-1">开始游玩日期</label>
-          <input v-model="form.start_date" type="date" class="input-field" />
+          <CustomDatePicker v-model="form.start_date" />
         </div>
         <div>
           <label class="block text-xs text-slate-500 mb-1">通关 / 结束日期</label>
-          <input v-model="form.finish_date" type="date" class="input-field" />
+          <CustomDatePicker v-model="form.finish_date" />
         </div>
       </div>
 

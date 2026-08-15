@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { RouterView } from 'vue-router'
 import AnimeBg from '@/components/AnimeBg.vue'
 import Live2dWaifu from '@/components/Live2dWaifu.vue'
+import AnimatedCursor from '@/components/AnimatedCursor.vue'
 
 const router = useRouter()
 const isLoggedIn = ref(false)
@@ -99,6 +100,9 @@ onMounted(async () => {
 
     <!-- 全局看板娘 -->
     <Live2dWaifu />
+
+    <!-- 朱雀院椿 动态鼠标指针 -->
+    <AnimatedCursor />
   </div>
 </template>
 
