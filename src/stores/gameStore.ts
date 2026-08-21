@@ -346,15 +346,30 @@ export const useGameStore = defineStore('game', {
     /** 保存私人笔记（upsert 到 game_private_notes 表） */
     async savePrivateNotes(gameId: string, notes: string | null): Promise<void> {
       const trimmed = notes?.trim() || null
-      // 获取当前用户 ID（RLS 要求 owner_id = auth.uid()）
-      const { data: sessionData } = await supabase.auth.getSession()
-      const userId = sessionData.session?.user.id
-      if (!userId) throw new Error('未登录，无法保存私人笔记')
+      // 用 getUser() 真实验证 JWT，同时 fallback 到 getSession()
+      // 因为 getUser() 在某些情况下可能 user.id 为 null
+      const { data: userData } = await supabase.auth.getUser()
+      let userId = userData.user?.id
+      if (!userId) {
+        // fallback: 从 session 获取
+        const { data: sessionData } = await supabase.auth.getSession()
+        userId = sessionData.session?.user?.id
+      }
+      if (!userId) {
+        await supabase.auth.signOut()
+        throw new Error('登录状态已失效，请重新登录后再试')
+      }
 
       if (trimmed) {
+        // 安全 upsert：先删旧记录，再插入新记录
+        await supabase
+          .from('game_private_notes')
+          .delete()
+          .eq('game_id', gameId)
+
         const { error } = await supabase
           .from('game_private_notes')
-          .upsert({ game_id: gameId, owner_id: userId, notes: trimmed }, { onConflict: 'game_id' })
+          .insert({ game_id: gameId, owner_id: userId, notes: trimmed })
         if (error) throw error
       } else {
         // 空笔记则删除记录
@@ -362,7 +377,6 @@ export const useGameStore = defineStore('game', {
           .from('game_private_notes')
           .delete()
           .eq('game_id', gameId)
-          .eq('owner_id', userId)
         if (error) throw error
       }
     },

@@ -135,9 +135,53 @@ FROM public.games g;
 GRANT SELECT ON public.games_with_private_notes TO anon, authenticated;
 
 -- ============================================================
---  6) 可选：新增一个管理员用户（把邮箱替换为你自己的）后，
+-- 6) 可选：新增一个管理员用户（把邮箱替换为你自己的）后，
 --     在 Auth → Users 中把邮箱用户创建出来，再执行下面的 SQL
 --     将所有 owner_id 为空的游戏的所有权赋予这个管理员
 -- ============================================================
 -- UPDATE public.games SET owner_id = (SELECT id FROM auth.users WHERE email = 'admin@example.com')
 --  WHERE owner_id IS NULL;
+
+-- ============================================================
+--  7) 私人笔记表：game_private_notes
+--     每个登录用户可以为每部游戏保存自己的私人笔记，仅本人可见
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS public.game_private_notes (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  game_id     uuid NOT NULL REFERENCES public.games(id) ON DELETE CASCADE,
+  owner_id    uuid REFERENCES auth.users(id) ON DELETE CASCADE,
+  notes       text,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  UNIQUE(game_id)  -- 每部游戏只能有一条私人笔记（单管理员场景）
+);
+
+-- 自动更新 updated_at
+DROP TRIGGER IF EXISTS game_private_notes_set_updated_at ON public.game_private_notes;
+CREATE TRIGGER game_private_notes_set_updated_at
+  BEFORE UPDATE ON public.game_private_notes
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- RLS 行级安全策略（单管理员场景：任何 authenticated 用户都能操作）
+ALTER TABLE public.game_private_notes ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "game_private_notes_select"
+  ON public.game_private_notes
+  FOR SELECT
+  TO authenticated USING (true);
+
+CREATE POLICY "game_private_notes_insert"
+  ON public.game_private_notes
+  FOR INSERT
+  TO authenticated WITH CHECK (true);
+
+CREATE POLICY "game_private_notes_update"
+  ON public.game_private_notes
+  FOR UPDATE
+  TO authenticated USING (true) WITH CHECK (true);
+
+CREATE POLICY "game_private_notes_delete"
+  ON public.game_private_notes
+  FOR DELETE
+  TO authenticated USING (true);
