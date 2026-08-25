@@ -86,19 +86,29 @@ function updateDevScrollState() {
 }
 
 // ---- 拖动 thumb ----
+// 注意：不能用 setPointerCapture —— 它会改变 pointermove 的派发行为，
+// Chrome 在 capture 期间会节流/合批 pointermove，导致 AnimatedCursor 的
+// window capture 监听器收不到连续坐标，自定义鼠标视觉上"卡住"。
+// 既然 pointermove/up 已注册在 window 上，无需 pointer capture 也能收到事件。
 let dragging = false
 let dragStartX = 0
 let dragStartScrollLeft = 0
+const dragThumbRef = ref<HTMLDivElement | null>(null)
 
 function onThumbPointerDown(e: PointerEvent) {
+  // 只响应鼠标左键
+  if (e.button !== 0) return
   e.preventDefault()
   e.stopPropagation()
   dragging = true
   dragStartX = e.clientX
   dragStartScrollLeft = devScrollRef.value?.scrollLeft ?? 0
-  ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+  // 拖动期间禁用过渡，保证跟手
+  if (dragThumbRef.value) dragThumbRef.value.style.transition = 'none'
   window.addEventListener('pointermove', onThumbPointerMove)
   window.addEventListener('pointerup', onThumbPointerUp, { once: true })
+  // 拖动期间万一指针离开窗口（如拖到浏览器外），也要能结束
+  window.addEventListener('pointercancel', onThumbPointerUp, { once: true })
 }
 
 function onThumbPointerMove(e: PointerEvent) {
@@ -120,6 +130,8 @@ function onThumbPointerMove(e: PointerEvent) {
 function onThumbPointerUp() {
   dragging = false
   window.removeEventListener('pointermove', onThumbPointerMove)
+  // 恢复过渡
+  if (dragThumbRef.value) dragThumbRef.value.style.transition = ''
 }
 
 // 点击 track 空白处：左半边向左滚一屏，右半边向右滚一屏
@@ -281,6 +293,7 @@ const activeFilters = computed(() => {
           @pointerdown="onTrackPointerDown"
         >
           <div
+            ref="dragThumbRef"
             class="dev-thumb absolute top-0 h-full rounded-full bg-gradient-to-r from-sakura-400 to-lavender-400 transition-[width,left] duration-75"
             :style="{ left: thumbLeft + '%', width: thumbWidth + '%' }"
             @pointerdown.stop="onThumbPointerDown"
@@ -363,12 +376,9 @@ const activeFilters = computed(() => {
   display: none;
 }
 
-/* 自定义滚动条 thumb：拖动时禁用过渡，跟手不滞后 */
+/* 自定义滚动条 thumb：拖动时通过 inline style 禁用过渡，保证跟手 */
 .dev-thumb {
   cursor: pointer;
   touch-action: none;  /* 阻止触屏滚动干扰 pointer 拖动 */
-}
-.dev-thumb:active {
-  transition: none;
 }
 </style>
