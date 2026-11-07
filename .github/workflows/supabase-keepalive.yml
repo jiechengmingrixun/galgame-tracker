@@ -1,12 +1,11 @@
 # =====================================================================
 #   Supabase 防休眠定时 ping（GitHub Actions）
-#   功能：Supabase Free Plan 会在 7 天无连接后暂停数据库实例。
-#         本工作流每天通过 HTTP 请求访问一次 REST API，
-#         模拟"有访问"从而避免实例休眠。
-#   配置：
-#     在 GitHub 仓库 Settings → Secrets and variables → Actions 添加：
-#     SUPABASE_URL    例: https://tdwbjahvsonfoawghmrk.supabase.co
-#     SUPABASE_ANON_KEY  例: eyJhbGciOiJIUzI1NiIs...（同项目 .env 里的 VITE_SUPABASE_ANON_KEY）
+#   Supabase Free Plan 连续 7 天无数据库访问会暂停实例。
+#   本工作流每天真实查询一次 games 表（只取 1 行主键），从而产生
+#   「数据库访问」而非仅访问 PostgREST 的 OpenAPI 根路径。
+#
+#   注意：GitHub 会在仓库 60 天无活动后自动禁用 schedule 触发器，
+#   因此本工作流会额外提交 .keepalive 文件以保持仓库活跃状态。
 # =====================================================================
 
 name: Supabase Keep Alive
@@ -16,31 +15,54 @@ on:
     - cron: '17 16 * * *'   # 每天 UTC 16:17 = 北京时间次日 00:17 触发
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Supabase REST API
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Ping Supabase database
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           set -e
-          echo "Pinging $SUPABASE_URL/rest/v1/"
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "❌ SUPABASE_URL / SUPABASE_ANON_KEY secret is missing"
+            exit 1
+          fi
+
+          URL="$SUPABASE_URL/rest/v1/games?select=id&limit=1"
+          echo "Pinging $URL"
           for i in 1 2 3; do
             echo "== attempt $i =="
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+            HTTP_CODE=$(curl -s -o resp.json -w "%{http_code}" \
               -H "apikey: $SUPABASE_ANON_KEY" \
               -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
-              "$SUPABASE_URL/rest/v1/")
+              "$URL")
             echo "HTTP status: $HTTP_CODE"
-            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "400" ] || [ "$HTTP_CODE" = "401" ]; then
-              echo "✅ Supabase is alive!"
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Database is awake: $(head -c 200 resp.json)"
               exit 0
             fi
+            head -c 300 resp.json; echo
             if [ "$i" -lt 3 ]; then
-              sleep 10
+              sleep 15
             fi
           done
-          echo "❌ Failed to reach Supabase after 3 attempts"
+          echo "❌ Failed to reach Supabase database after 3 attempts"
+          echo "提示：若返回 540/503 说明项目已休眠，需在 Supabase Dashboard 手动恢复"
           exit 1
+
+      - name: Keep repository active
+        run: |
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > .keepalive
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .keepalive
+          git commit -m "chore: supabase keepalive $(date -u +%Y-%m-%d)"
+          git push

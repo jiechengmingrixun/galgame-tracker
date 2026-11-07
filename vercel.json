@@ -4,6 +4,12 @@
   "outputDirectory": "dist",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
+  "crons": [
+    {
+      "path": "/api/keepalive",
+      "schedule": "30 16 * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/vndb-proxy/:path*",
